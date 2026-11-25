@@ -2,742 +2,816 @@
 <html lang="en">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
 <title>Even Frames</title>
-<meta name="claude:viewport-fit-sides" content="cover">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600&display=swap">
 <style>
-/* Layout: one mobile column (max 620px), steps top to bottom, sticky export bar at the bottom. */
-:root {
-  --bg: #f3f4f7; --surface: #ffffff; --fg: #15171c; --muted: #5f6573; --line: #dfe2e9;
-  --accent: #3550d4; --accent-fg: #ffffff; --accent-soft: #e6eafb; --guide: #e0457b;
-  --warn: #9a5b00; --ok: #1f7a4d; --shade: rgba(14, 16, 22, .55);
-  --display: "Space Grotesk", "SF Pro Display", -apple-system, system-ui, sans-serif;
-  --body: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
-  --r: 14px;
-}
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
-  --bg: #0f1116; --surface: #181b22; --fg: #eceef3; --muted: #9aa1b0; --line: #2a2f3a;
-  --accent: #8ea0ff; --accent-fg: #0f1116; --accent-soft: #232a45; --guide: #ff6b9c;
-  --warn: #f0b45a; --ok: #5fd39a; --shade: rgba(0, 0, 0, .65); color-scheme: dark } }
-:root[data-theme="dark"] {
-  --bg: #0f1116; --surface: #181b22; --fg: #eceef3; --muted: #9aa1b0; --line: #2a2f3a;
-  --accent: #8ea0ff; --accent-fg: #0f1116; --accent-soft: #232a45; --guide: #ff6b9c;
-  --warn: #f0b45a; --ok: #5fd39a; --shade: rgba(0, 0, 0, .65); color-scheme: dark }
-
-* { box-sizing: border-box; }
-[hidden] { display: none !important; }
-body { margin: 0; }
-body { background: var(--bg); color: var(--fg); font: 15px/1.45 var(--body); -webkit-text-size-adjust: 100%; }
-.wrap { max-width: 620px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px));
-  padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 18px 120px; display: grid; gap: 14px; }
-h1 { font: 600 26px/1.1 var(--display); margin: 0; letter-spacing: -.01em; }
-.lede { color: var(--muted); margin: 4px 0 0; }
-.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 14px; display: grid; gap: 12px; min-width: 0; }
-.card h2 { font: 600 13px/1 var(--body); text-transform: uppercase; letter-spacing: .07em; color: var(--muted); margin: 0;
-  display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-.card h2 .hint { text-transform: none; letter-spacing: 0; font-weight: 500; }
-.muted { color: var(--muted); font-size: 13px; }
-.warn { color: var(--warn); font-size: 13px; }
-button { font: inherit; color: inherit; }
-.btn { border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 9px 14px; cursor: pointer; font-weight: 500; min-height: 40px; }
-.btn.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); font-weight: 600; }
-.btn:disabled { opacity: .45; cursor: default; }
-.btn:focus-visible, .chip:focus-visible, .seg button:focus-visible, .slot:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-
-/* photo slots */
-.ref-slot { display: grid; grid-template-columns: 84px 1fr; gap: 12px; align-items: center; }
-.slot { width: 84px; aspect-ratio: 3 / 4; border-radius: 10px; border: 1.5px dashed var(--line); background: var(--bg);
-  display: grid; place-items: center; overflow: hidden; position: relative; cursor: pointer; padding: 0; }
-.slot img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.slot .plus { font: 500 28px/1 var(--display); color: var(--muted); }
-.thumbs { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 10px; }
-.thumb { position: relative; }
-.thumb .slot { width: 100%; border-style: solid; }
-.thumbs > .slot { width: 100%; }
-.thumb .x { position: absolute; top: 4px; right: 4px; width: 26px; height: 26px; border-radius: 50%; border: 0;
-  background: var(--shade); color: #fff; cursor: pointer; font-size: 15px; line-height: 1; }
-.badge { position: absolute; left: 4px; bottom: 4px; font-size: 11px; font-weight: 600; padding: 2px 6px; border-radius: 6px;
-  background: var(--shade); color: #fff; }
-.badge.bad { background: var(--warn); color: #fff; }
-.ref-meta { display: grid; gap: 6px; min-width: 0; }
-.ref-meta .row { display: flex; gap: 8px; flex-wrap: wrap; }
-
-/* chips + segmented */
-.chips { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
-.chips::-webkit-scrollbar { display: none; }
-.chip { flex: none; border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 7px 13px; cursor: pointer;
-  font-variant-numeric: tabular-nums; min-height: 36px; }
-.chip[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
-.custom { display: flex; gap: 8px; align-items: center; }
-.custom input { width: 72px; padding: 8px; border: 1px solid var(--line); border-radius: 8px; font: inherit; background: var(--surface); color: var(--fg); }
-.seg { display: inline-flex; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 3px; gap: 2px; }
-.seg button { border: 0; background: transparent; border-radius: 8px; padding: 6px 12px; cursor: pointer; font-size: 14px; }
-.seg button[aria-pressed="true"] { background: var(--surface); box-shadow: 0 1px 2px rgba(0,0,0,.12); font-weight: 600; }
-
-/* sliders */
-.field { display: grid; grid-template-columns: 1fr auto; gap: 4px 8px; align-items: center; }
-.field input[type=range] { grid-column: 1 / -1; width: 100%; accent-color: var(--accent); height: 28px; }
-.val { color: var(--muted); font-variant-numeric: tabular-nums; font-size: 14px; }
-.toggle { display: flex; align-items: center; gap: 10px; cursor: pointer; }
-.toggle input { width: 20px; height: 20px; accent-color: var(--accent); }
-
-/* results carousel */
-.carousel { display: flex; gap: 10px; overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: 4px; }
-.frame { flex: none; width: min(78%, 360px); scroll-snap-align: start; display: grid; gap: 6px; }
-.frame .pic { position: relative; border-radius: 8px; overflow: hidden; background: var(--bg); }
-.frame canvas { display: block; width: 100%; height: auto; }
-.frame .cap { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: var(--muted); gap: 6px; }
-.frame .cap button { border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 4px 9px; cursor: pointer; font-size: 13px; }
-.guide { position: absolute; left: 0; right: 0; border-top: 1.5px dashed var(--guide); pointer-events: none; }
-.guide.v { top: 0; bottom: 0; left: auto; right: auto; border-top: 0; border-left: 1.5px dashed var(--guide); }
-
-/* compare */
-.compare { position: relative; border-radius: 10px; overflow: hidden; touch-action: pan-y; user-select: none; -webkit-user-select: none; cursor: ew-resize; background: var(--bg); }
-.compare canvas { display: block; width: 100%; height: auto; }
-.compare .after { position: absolute; inset: 0; }
-.compare .handle { position: absolute; top: 0; bottom: 0; width: 0; border-left: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.25); pointer-events: none; }
-.compare .knob { position: absolute; top: 50%; left: -19px; width: 38px; height: 38px; margin-top: -19px; border-radius: 50%; background: #fff;
-  box-shadow: 0 2px 8px rgba(0,0,0,.3); display: grid; place-items: center; color: #15171c; font: 600 14px/1 var(--body); }
-.compare .tag { position: absolute; top: 8px; font-size: 12px; font-weight: 600; padding: 3px 8px; border-radius: 6px; background: var(--shade); color: #fff; pointer-events: none; }
-.compare .tag.l { left: 8px; } .compare .tag.r { right: 8px; }
-.compare-bar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; justify-content: space-between; }
-
-/* empty state illustration */
-.empty { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.mock { aspect-ratio: 4 / 5; border-radius: 8px; background: var(--accent-soft); position: relative; overflow: hidden; }
-.mock .head { position: absolute; left: 50%; width: 22%; aspect-ratio: 1; border-radius: 50%; background: var(--accent); transform: translateX(-50%); }
-.mock .body { position: absolute; left: 50%; width: 46%; height: 60%; border-radius: 40% 40% 0 0; background: var(--accent); opacity: .55; transform: translateX(-50%); }
-.mock.b .head { top: 34%; width: 13%; } .mock.b .body { top: 47%; width: 28%; }
-.mock.a .head { top: 24%; } .mock.a .body { top: 46%; }
-.mock .guide { top: 24%; }
-
-/* export bar + results */
-.bar { position: fixed; left: 0; right: 0; bottom: 0; background: var(--surface); border-top: 1px solid var(--line); z-index: 5;
-  padding: 10px max(16px, env(safe-area-inset-right, 0px)) calc(10px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
-.bar .in { max-width: 620px; margin: 0 auto; display: flex; gap: 10px; align-items: center; }
-.bar .in .btn.primary { flex: 1; min-height: 48px; font-size: 16px; }
-.bar .sum { font-size: 12px; color: var(--muted); max-width: 46%; }
-.outs { display: grid; gap: 14px; }
-.out { display: grid; gap: 8px; }
-.out img { width: 100%; height: auto; border-radius: 8px; display: block; -webkit-touch-callout: default; }
-.out .row { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
-
-/* head box editor */
-.sheet { position: fixed; inset: 0; background: var(--shade); z-index: 20; display: grid; place-items: end center; }
-.sheet .panel { background: var(--surface); width: 100%; max-width: 620px; border-radius: 18px 18px 0 0; display: grid; gap: 12px;
-  padding: 14px max(16px, env(safe-area-inset-right, 0px)) calc(14px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); max-height: 100%; }
-.editor { position: relative; margin: 0 auto; touch-action: none; user-select: none; -webkit-user-select: none; }
-.editor img { display: block; max-width: 100%; max-height: 62vh; width: auto; height: auto; border-radius: 6px; }
-.editor .box { position: absolute; border: 2px solid var(--guide); border-radius: 8px; box-shadow: 0 0 0 9999px rgba(0,0,0,.25); cursor: move; }
-.editor .rz { position: absolute; right: -14px; bottom: -14px; width: 28px; height: 28px; border-radius: 50%; background: var(--guide); border: 3px solid #fff; cursor: nwse-resize; }
-.sheet .acts { display: flex; gap: 8px; justify-content: flex-end; }
-.status { font-size: 13px; color: var(--muted); display: flex; gap: 6px; align-items: center; }
-.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex: none; }
-.dot.ok { background: var(--ok); } .dot.bad { background: var(--warn); }
-@media (prefers-reduced-motion: no-preference) { .carousel { scroll-behavior: smooth; } }
+:root{--fg:#fff;--fg2:rgba(255,255,255,.72);--fg3:rgba(255,255,255,.5);--accent:#0a84ff;--warn:#ffd60a;--blur:24px;
+--st:env(safe-area-inset-top,0px);--sb:env(safe-area-inset-bottom,0px);
+--font:-apple-system,BlinkMacSystemFont,"SF Pro Text",Inter,Roboto,"Segoe UI",system-ui,sans-serif}
+:root.lite{--blur:10px}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+[hidden]{display:none!important}
+html,body{margin:0;height:100%;overflow:hidden;color:var(--fg);font:15px/1.4 var(--font);-webkit-text-size-adjust:100%;-webkit-user-select:none;user-select:none}
+body{background:radial-gradient(120% 80% at 15% 0%,#1c2a46 0%,transparent 60%),radial-gradient(100% 70% at 100% 100%,#3b2236 0%,transparent 60%),#000}
+button{font:inherit;color:inherit;border:0;background:none;padding:0;cursor:pointer}
+button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+svg.i{width:20px;height:20px;flex:none}
+.glass{background:rgba(255,255,255,.14);-webkit-backdrop-filter:blur(var(--blur)) saturate(180%);backdrop-filter:blur(var(--blur)) saturate(180%);
+ box-shadow:inset 0 .5px 0 rgba(255,255,255,.55),inset 0 0 0 .5px rgba(255,255,255,.2),0 10px 30px rgba(0,0,0,.3)}
+.glass.pri{background:rgba(10,132,255,.85);font-weight:600}
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){.glass{background:rgba(40,40,44,.94)}}
+@media (prefers-reduced-transparency:reduce){.glass{background:rgba(40,40,44,.97);backdrop-filter:none;-webkit-backdrop-filter:none}}
+.circ{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;flex:none}
+.circ.sm{width:40px;height:40px}
+.circ[aria-pressed=true]{background:rgba(255,255,255,.9);color:#000}
+.pill{height:40px;padding:0 16px;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;gap:6px;font-size:14px;font-weight:500;white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.pill.warn{color:var(--warn)}
+.pill.wide{width:100%;height:50px;font-size:16px}
+/* empty */
+#empty{position:fixed;inset:0;display:grid;place-items:center;padding:24px}
+.hero{max-width:380px;border-radius:32px;padding:28px 24px;display:grid;gap:14px;text-align:center}
+.hero h1{margin:0;font-size:28px;font-weight:700;letter-spacing:-.02em}
+.hero p{margin:0;color:var(--fg2)}
+.hero .fine{font-size:13px;color:var(--fg3)}
+.hero .pill{height:52px;font-size:17px}
+/* top */
+.top{position:fixed;left:0;right:0;top:0;z-index:10;padding:calc(var(--st) + 10px) 12px 0;display:flex;align-items:center;gap:8px;pointer-events:none}
+.top>*{pointer-events:auto}
+.top .mid{flex:1;display:flex;justify-content:center;min-width:0}
+/* stage */
+#frame{position:fixed;left:50%;transform:translateX(-50%);touch-action:none;cursor:grab;border-radius:16px;overflow:hidden;background:#111}
+#frame canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+#gh{opacity:.4;pointer-events:none}
+#guides{position:absolute;inset:0;pointer-events:none}
+.g-box{position:absolute;border:1.5px dashed rgba(255,214,10,.95);border-radius:12px}
+.g-box.round{border-radius:50%}
+.g-line{position:absolute;height:0;border-top:2px dashed rgba(255,214,10,.95)}
+.tag{position:absolute;top:10px;left:10px;height:28px;padding:0 12px;border-radius:999px;display:inline-flex;align-items:center;font-size:12px;font-weight:600}
+.tag.warn{color:var(--warn)}
+.fabs{position:absolute;right:10px;top:10px;display:grid;gap:8px}
+.banner{position:absolute;left:10px;right:10px;bottom:10px;border-radius:18px;padding:8px 8px 8px 14px;display:flex;align-items:center;gap:8px;font-size:13px}
+.banner span{flex:1}
+.banner.warn span{color:var(--warn)}
+.chipb{height:32px;padding:0 12px;border-radius:999px;background:rgba(255,255,255,.9);color:#000;font-size:13px;font-weight:600;flex:none}
+#grid{position:fixed;left:12px;right:12px;overflow-y:auto;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;align-content:start;padding-bottom:12px}
+.cell{position:relative;border-radius:14px;overflow:hidden;background:#111}
+.cell canvas{display:block;width:100%;height:auto}
+/* dock */
+.dock{position:fixed;left:10px;right:10px;bottom:calc(var(--sb) + 10px);z-index:10;display:grid;gap:8px;max-width:560px;margin:0 auto}
+.panel{border-radius:26px;padding:12px 14px}
+.panel section{display:grid;gap:10px}
+.field{display:grid;grid-template-columns:1fr auto;gap:2px 8px;align-items:center;font-size:13px;color:var(--fg2)}
+.field input{grid-column:1/-1;width:100%;accent-color:#fff;height:28px;margin:0}
+.hint{margin:0;font-size:13px;color:var(--fg2)}
+.chips{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex:none;height:32px;padding:0 13px;border-radius:999px;background:rgba(255,255,255,.12);font-size:13px;font-variant-numeric:tabular-nums}
+.chip[aria-pressed=true]{background:#fff;color:#000;font-weight:600}
+.seg{display:flex;background:rgba(255,255,255,.1);border-radius:999px;padding:3px;gap:2px}
+.seg button{flex:1;height:32px;border-radius:999px;font-size:13px;color:var(--fg2);white-space:nowrap}
+.seg button[aria-pressed=true]{background:rgba(255,255,255,.92);color:#000;font-weight:600}
+.btnrow{display:flex;gap:8px;flex-wrap:wrap}
+.btn{height:36px;padding:0 14px;border-radius:999px;background:rgba(255,255,255,.14);font-size:14px;font-weight:500}
+.btn[aria-pressed=true]{background:rgba(255,255,255,.92);color:#000}
+.strip{border-radius:24px;padding:8px;display:flex;gap:8px;overflow-x:auto;scrollbar-width:none}
+.strip::-webkit-scrollbar{display:none}
+.th{position:relative;flex:none;width:52px;height:64px;border-radius:14px;overflow:hidden;background:#222;box-shadow:inset 0 0 0 2px transparent}
+.th img{width:100%;height:100%;object-fit:cover;display:block}
+.th.on::after{content:"";position:absolute;inset:0;border-radius:14px;box-shadow:inset 0 0 0 2.5px #fff}
+.th.add{display:grid;place-items:center;background:rgba(255,255,255,.1)}
+.b-ref{position:absolute;left:3px;top:3px;width:18px;height:18px;border-radius:50%;background:rgba(0,0,0,.55);display:grid;place-items:center}
+.b-ref svg{width:12px;height:12px;fill:var(--warn);stroke:none}
+.b-warn{position:absolute;right:3px;top:3px;width:18px;height:18px;border-radius:50%;background:var(--warn);color:#000;font-size:12px;font-weight:800;display:grid;place-items:center}
+.b-px{position:absolute;left:0;right:0;bottom:0;background:rgba(0,0,0,.6);color:var(--warn);font-size:10px;font-weight:700;text-align:center;padding:1px 0}
+.tabs{border-radius:999px;padding:4px;display:flex}
+.tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:1px;font-size:11px;padding:6px 0;border-radius:999px;color:var(--fg2)}
+.tab.on{background:rgba(255,255,255,.2);color:#fff}
+.toast{position:fixed;left:50%;transform:translateX(-50%);top:calc(var(--st) + 64px);z-index:40;padding:10px 16px;border-radius:999px;font-size:14px;max-width:calc(100vw - 32px)}
+/* sheets */
+.sheet{position:fixed;inset:0;z-index:30;background:rgba(0,0,0,.6);display:flex;flex-direction:column}
+.sheet-bar{margin:calc(var(--st) + 10px) 12px 0;border-radius:999px;padding:4px;display:flex;align-items:center;justify-content:space-between}
+.sheet-bar strong{font-size:15px}
+.ed-wrap{flex:1;min-height:0;display:grid;place-items:center;padding:12px}
+#editor{position:relative;touch-action:none}
+#edImg{display:block;max-width:calc(100vw - 24px);max-height:calc(100dvh - 230px);border-radius:10px}
+#edBox{position:absolute;border:2px solid var(--warn);border-radius:12px;box-shadow:0 0 0 9999px rgba(0,0,0,.35);cursor:move}
+#edBox.round{border-radius:50%}
+.rz{position:absolute;right:-14px;bottom:-14px;width:28px;height:28px;border-radius:50%;background:var(--warn);border:3px solid #fff;cursor:nwse-resize}
+#edLine{position:absolute;inset:0}
+#edSvg{position:absolute;left:0;top:0;pointer-events:none}
+.h{position:absolute;width:30px;height:30px;margin:-15px 0 0 -15px;border-radius:50%;background:var(--warn);border:3px solid #fff}
+.sheet-foot{margin:0 12px calc(var(--sb) + 12px);border-radius:26px;padding:12px 14px;display:grid;gap:10px}
+.bs{margin-top:auto;max-height:90dvh;overflow-y:auto;border-radius:30px 30px 0 0;padding:14px 16px calc(var(--sb) + 16px);display:grid;gap:12px;background:rgba(30,30,34,.7)}
+.bs-h{display:flex;justify-content:space-between;align-items:center}
+.bs-h strong{font-size:18px}
+.opts{display:grid;gap:8px}
+.opt{display:grid;gap:2px;text-align:left;padding:12px 14px;border-radius:18px;background:rgba(255,255,255,.08);box-shadow:inset 0 0 0 1.5px transparent}
+.opt span{font-size:13px;color:var(--fg2)}
+.opt[aria-pressed=true]{box-shadow:inset 0 0 0 2px var(--accent);background:rgba(10,132,255,.14)}
+#custom{display:grid;gap:10px}
+.outs{display:grid;gap:12px}
+.out{display:grid;gap:6px}
+.out img{width:100%;border-radius:12px;display:block;-webkit-touch-callout:default;-webkit-user-select:auto}
+.out .row{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:12px;color:var(--fg2)}
 </style>
 
-<div class="wrap">
-  <header>
+<div id="empty">
+  <div class="hero glass">
     <h1>Even Frames</h1>
-    <p class="lede">Match subject size, position and color across a photo set before you post. Photos stay on your phone.</p>
-    <p class="status" id="engine"><span class="dot"></span><span>Loading face detection…</span></p>
-  </header>
-
-  <section class="card" aria-labelledby="h-ref">
-    <h2 id="h-ref">1 · Reference photo <span class="hint">the look to match</span></h2>
-    <div class="ref-slot">
-      <button class="slot" id="refSlot" aria-label="Choose reference photo"><span class="plus">+</span></button>
-      <div class="ref-meta">
-        <div id="refInfo" class="muted">Pick the photo you like most. Every other photo will copy its framing and color.</div>
-        <div class="row" id="refActs" hidden>
-          <button class="btn" id="refChange">Change</button>
-          <button class="btn" id="refHead">Adjust head box</button>
-        </div>
-      </div>
-    </div>
-    <input type="file" id="refFile" accept="image/*" hidden>
-  </section>
-
-  <section class="card" aria-labelledby="h-fix">
-    <h2 id="h-fix">2 · Photos to match <span class="hint" id="fixCount">none yet</span></h2>
-    <div class="thumbs" id="thumbs">
-      <button class="slot" id="addSlot" aria-label="Add photos to match"><span class="plus">+</span></button>
-    </div>
-    <p class="muted">Tap a photo to fix its head box if the detection missed.</p>
-    <input type="file" id="fixFile" accept="image/*" multiple hidden>
-  </section>
-
-  <section class="card" aria-labelledby="h-frame">
-    <h2 id="h-frame">3 · Frame</h2>
-    <div class="chips" id="aspects" role="group" aria-label="Frame ratio"></div>
-    <div class="custom" id="custom" hidden>
-      <input type="number" id="cw" min="1" step="0.1" value="4" aria-label="Custom width"> <span>:</span>
-      <input type="number" id="ch" min="1" step="0.1" value="5" aria-label="Custom height">
-    </div>
-  </section>
-
-  <section class="card" aria-labelledby="h-prev">
-    <h2 id="h-prev">4 · Result <label class="toggle hint"><input type="checkbox" id="guides" checked> Guides</label></h2>
-    <div id="empty" class="empty" aria-hidden="true">
-      <div class="mock b"><div class="body"></div><div class="head"></div></div>
-      <div class="mock a"><div class="body"></div><div class="head"></div><div class="guide"></div></div>
-    </div>
-    <p id="emptyTxt" class="muted">Before → after: the smaller subject gets reframed to the reference’s size and spot.</p>
-    <div class="carousel" id="carousel" hidden></div>
-    <p class="muted" id="layoutInfo"></p>
-  </section>
-
-  <section class="card" aria-labelledby="h-cmp" id="cmpCard" hidden>
-    <h2 id="h-cmp">Compare <span class="hint">drag the slider</span></h2>
-    <div class="compare-bar">
-      <div class="chips" id="cmpPick" role="group" aria-label="Photo to compare"></div>
-      <div class="seg" role="group" aria-label="Compare against">
-        <button id="vsOrig" aria-pressed="true">vs Original</button>
-        <button id="vsRef" aria-pressed="false">vs Reference</button>
-      </div>
-    </div>
-    <div class="compare" id="compare">
-      <canvas id="cmpBefore"></canvas>
-      <canvas id="cmpAfter" class="after"></canvas>
-      <span class="tag l" id="tagL">Original</span><span class="tag r">After</span>
-      <div class="handle" id="handle"><div class="knob">⇆</div></div>
-    </div>
-  </section>
-
-  <section class="card" aria-labelledby="h-adj">
-    <h2 id="h-adj">5 · Adjust</h2>
-    <label class="field"><span>Subject size</span><span class="val" id="zoomV">1.00×</span>
-      <input type="range" id="zoom" min="1" max="2.5" step="0.01" value="1"></label>
-    <label class="toggle"><input type="checkbox" id="auto" checked> Keep reference position</label>
-    <label class="field"><span>Horizontal</span><span class="val" id="txV">–</span>
-      <input type="range" id="tx" min="0.1" max="0.9" step="0.01" value="0.5" disabled></label>
-    <label class="field"><span>Vertical</span><span class="val" id="tyV">–</span>
-      <input type="range" id="ty" min="0.1" max="0.9" step="0.01" value="0.4" disabled></label>
-    <label class="field"><span>Color match</span><span class="val" id="strV">70%</span>
-      <input type="range" id="strength" min="0" max="100" step="1" value="70"></label>
-  </section>
-
-  <section class="card" aria-labelledby="h-exp">
-    <h2 id="h-exp">6 · Export</h2>
-    <div class="field" style="grid-template-columns:1fr"><span>Format</span>
-      <div class="seg" id="fmt" role="group" aria-label="Format">
-        <button data-v="image/jpeg" aria-pressed="true">JPEG</button>
-        <button data-v="image/png" aria-pressed="false">PNG</button>
-        <button data-v="image/webp" aria-pressed="false" id="webpBtn">WebP</button>
-      </div></div>
-    <label class="field" id="qField"><span>Quality</span><span class="val" id="qV">95</span>
-      <input type="range" id="quality" min="80" max="100" step="1" value="95"></label>
-    <div class="field" style="grid-template-columns:1fr"><span>Width</span>
-      <div class="chips" id="widths" role="group" aria-label="Output width"></div></div>
-    <p class="muted" id="expInfo">Full keeps every pixel of each crop (sharpest). PNG is lossless but large.</p>
-    <div class="outs" id="outs"></div>
-  </section>
+    <p>Add the whole set first. You'll pick the photo to match once you can see them all.</p>
+    <button class="glass pri pill" id="pick">Choose photos</button>
+    <p class="fine">Photos never leave this device.</p>
+  </div>
 </div>
 
-<div class="bar"><div class="in">
-  <span class="sum" id="barSum">Add a reference and 1+ photos</span>
-  <button class="btn primary" id="exportBtn" disabled>Export</button>
-</div></div>
+<div id="app" hidden>
+  <div class="top" id="top">
+    <button class="glass circ" id="viewBtn" aria-label="Show all photos"></button>
+    <div class="mid"><button class="glass pill" id="status"></button></div>
+    <button class="glass pri pill" id="exportBtn">Export</button>
+  </div>
+
+  <div id="frame">
+    <canvas id="pv"></canvas><canvas id="gh"></canvas>
+    <div id="guides"></div>
+    <span class="glass tag" id="tag" hidden></span>
+    <div class="fabs">
+      <button class="glass circ sm" id="ghostBtn" data-ic="ghost" aria-label="Overlay the reference" aria-pressed="false"></button>
+      <button class="glass circ sm" id="cmpBtn" data-ic="compare" aria-label="Hold to see the original"></button>
+    </div>
+    <div class="glass banner" id="banner" hidden><span id="bTxt"></span><button class="chipb" id="bAct"></button></div>
+  </div>
+  <div id="grid" hidden></div>
+
+  <div class="dock" id="dock">
+    <div class="glass panel" id="panel">
+      <section data-p="frame">
+        <div class="chips" id="ratios" role="group" aria-label="Frame ratio"></div>
+        <label class="field"><span>Subject size</span><span id="zoomV"></span>
+          <input type="range" id="zoom" min="0.6" max="2.5" step="0.01"></label>
+        <div class="seg" id="edges" role="group" aria-label="When a photo runs out of edge">
+          <button data-v="fill">Fill edges</button><button data-v="tight">Crop tighter</button></div>
+      </section>
+      <section data-p="pos" hidden>
+        <p class="hint">Drag the photo to move the subject. Every photo follows.</p>
+        <div class="btnrow"><button class="btn" id="posReset">Match reference</button><button class="btn" id="guidesBtn">Guides</button></div>
+      </section>
+      <section data-p="color" hidden>
+        <label class="field"><span>Match reference color</span><span id="colV"></span>
+          <input type="range" id="col" min="0" max="100" step="1"></label>
+        <div class="seg" id="protect" role="group" aria-label="Color applies to">
+          <button data-v="1">Protect subject</button><button data-v="0">Whole photo</button></div>
+      </section>
+      <section data-p="subj" hidden>
+        <div class="seg" id="kinds" role="group" aria-label="Match by"><button data-v="face"></button><button data-v="body"></button><button data-v="object"></button></div>
+        <p class="hint" id="subjInfo"></p>
+        <div class="btnrow"><button class="btn" id="editBtn">Edit subject</button><button class="btn" id="refBtn">Make reference</button><button class="btn" id="rmBtn">Remove</button></div>
+      </section>
+    </div>
+    <div class="glass strip" id="strip"></div>
+    <div class="glass tabs" id="tabs">
+      <button class="tab" data-t="frame" data-ic="frame">Frame</button>
+      <button class="tab" data-t="pos" data-ic="move">Position</button>
+      <button class="tab" data-t="color" data-ic="color">Color</button>
+      <button class="tab" data-t="subj" data-ic="subject">Subject</button>
+    </div>
+  </div>
+</div>
+
+<div class="glass toast" id="toast" hidden></div>
+<input type="file" id="file" accept="image/*" multiple hidden>
 
 <div class="sheet" id="sheet" hidden>
-  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="sheetT">
-    <strong id="sheetT">Head box</strong>
-    <p class="muted" style="margin:0">Drag the box over the face (forehead to chin). Drag the dot to resize.</p>
-    <div class="editor" id="editor"><img id="edImg" alt=""><div class="box" id="edBox"><div class="rz" id="edRz"></div></div></div>
-    <div class="acts">
-      <button class="btn" id="edReset">Reset</button>
-      <button class="btn primary" id="edDone">Done</button>
+  <div class="glass sheet-bar"><button class="pill" id="edCancel">Cancel</button><strong id="edT">Subject</strong><button class="glass pri pill" id="edDone">Done</button></div>
+  <div class="ed-wrap"><div id="editor">
+    <img id="edImg" alt="">
+    <div id="edBox"><div class="rz"></div></div>
+    <div id="edLine"><svg id="edSvg"><line id="edL" stroke="#ffd60a" stroke-width="3" stroke-dasharray="6 5"/></svg><div class="h" data-i="0"></div><div class="h" data-i="1"></div></div>
+  </div></div>
+  <div class="glass sheet-foot"><p class="hint" id="edHint"></p><div class="btnrow"><button class="btn" id="edReset">Reset to auto</button></div></div>
+</div>
+
+<div class="sheet" id="exp" hidden>
+  <div class="bs glass">
+    <div class="bs-h"><strong>Export</strong><button class="glass circ sm" id="expClose" aria-label="Close">✕</button></div>
+    <div class="opts" id="presets"></div>
+    <div id="custom" hidden>
+      <div class="seg" id="fmt"><button data-v="image/jpeg">JPEG</button><button data-v="image/png">PNG</button><button data-v="image/webp" id="webpBtn">WebP</button></div>
+      <label class="field" id="qRow"><span>Quality</span><span id="qV"></span><input type="range" id="q" min="80" max="100" step="1"></label>
+      <div class="chips" id="widths"></div>
     </div>
+    <p class="hint" id="expNote"></p>
+    <button class="glass pri pill wide" id="expGo">Export</button>
+    <div class="outs" id="outs"></div>
   </div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script type="module">
+/* ---------- basics */
 const $ = (id) => document.getElementById(id);
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
-const SMALL = 640;     // detection + color stats resolution (long edge)
-const MID = 1600;      // preview source resolution (long edge)
-const PREV = 1000;     // preview canvas long edge
-const MAX_AREA = 16_000_000; // iOS canvas pixel ceiling
+const mk = (w, h) => { const c = document.createElement("canvas"); c.width = w; c.height = h; return c; };
+const tick = () => new Promise((r) => setTimeout(r, 30));
+const SMALL = 640, HI = 1280, MID = 1600, PREV = 1200, MAX_AREA = 16_000_000;
+const KN = { face: "Face", body: "Body", object: "Object" };
+const MODEL = {
+  pose: "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task",
+  object: "https://storage.googleapis.com/mediapipe-models/object_detector/efficientdet_lite0/int8/1/efficientdet_lite0.tflite",
+  touch: "https://storage.googleapis.com/mediapipe-models/interactive_segmenter/magic_touch/float32/1/magic_touch.tflite",
+};
+const P3 = (() => { try { const x = mk(1, 1).getContext("2d", { colorSpace: "display-p3" }); return x?.getContextAttributes?.().colorSpace === "display-p3"; } catch { return false; } })();
+const ctx = (c, read) => c.getContext("2d", Object.assign(P3 ? { colorSpace: "display-p3" } : {}, read ? { willReadFrequently: true } : {}));
+if ((navigator.deviceMemory || 8) <= 4 || (navigator.hardwareConcurrency || 8) <= 4) document.documentElement.classList.add("lite");
 
-const S = { ref: null, others: [], aspect: "4:5", vs: "orig", cmp: 0, fmt: "image/jpeg", width: "full", lay: null, nextId: 1 };
+const S = { photos: [], ref: 0, cur: 0, kind: "face", kindLocked: false, aspect: "4:5", zoom: 1, edges: "fill", pos: null,
+  color: 70, protect: true, guides: true, ghost: false, comparing: false, fast: false, view: "one", tab: "frame",
+  preset: "ig", fmt: "image/jpeg", q: 92, width: "full", lay: null, params: [], busyText: "", nextId: 1 };
 
-/* ---------------- detection engine (MediaPipe, loaded from files next to this page) */
-let engine = null;
+const IC = {
+  frame: '<path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3"/><circle cx="12" cy="10" r="2.5"/><path d="M8 17c.8-2 2.2-3 4-3s3.2 1 4 3"/>',
+  move: '<path d="M12 3v18M3 12h18M9 6l3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3M18 9l3 3-3 3"/>',
+  color: '<circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/>',
+  subject: '<circle cx="12" cy="8" r="3.5"/><path d="M5 20c1.2-3.6 3.8-5.5 7-5.5s5.8 1.9 7 5.5"/>',
+  grid: '<rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/>',
+  single: '<rect x="5" y="3" width="14" height="18" rx="2.5"/>',
+  compare: '<circle cx="12" cy="12" r="8"/><path d="M12 4v16"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/>',
+  ghost: '<rect x="3" y="7" width="11" height="14" rx="2"/><rect x="10" y="3" width="11" height="14" rx="2" stroke-dasharray="2.5 2.5"/>',
+  star: '<path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+};
+const ic = (n) => `<svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${IC[n]}</svg>`;
+
+function toast(t) { const el = $("toast"); el.textContent = t; el.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => (el.hidden = true), 2600); }
+
+/* ---------- detection engine: face + person mask from local files, the rest on demand */
+let V = null, FS = null; const E = {};
 const engineReady = (async () => {
   try {
     const base = new URL("mp/", location.href).href;
-    const vision = await import(base + "vision_bundle.mjs");
+    V = await import(base + "vision_bundle.mjs");
     const models = await (await fetch(base + "models.json")).json();
     const b64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
-    const fileset = { wasmLoaderPath: base + "vision_wasm_internal.js", wasmBinaryPath: base + "vision_wasm_internal.wasm" };
-    const face = await vision.FaceDetector.createFromOptions(fileset, {
-      baseOptions: { modelAssetBuffer: b64(models.face), delegate: "CPU" }, runningMode: "IMAGE", minDetectionConfidence: 0.4 });
-    let seg = null;
+    FS = { wasmLoaderPath: base + "vision_wasm_internal.js", wasmBinaryPath: base + "vision_wasm_internal.wasm" };
+    E.face = await V.FaceDetector.createFromOptions(FS, { baseOptions: { modelAssetBuffer: b64(models.face), delegate: "CPU" }, runningMode: "IMAGE", minDetectionConfidence: 0.4 });
     try {
-      seg = await vision.ImageSegmenter.createFromOptions(fileset, {
-        baseOptions: { modelAssetBuffer: b64(models.seg), delegate: "CPU" }, runningMode: "IMAGE",
-        outputConfidenceMasks: true, outputCategoryMask: false });
+      E.seg = await V.ImageSegmenter.createFromOptions(FS, { baseOptions: { modelAssetBuffer: b64(models.seg), delegate: "CPU" }, runningMode: "IMAGE", outputConfidenceMasks: true, outputCategoryMask: false });
     } catch (e) { console.warn("segmenter", e); }
-    engine = { face, seg };
-    setEngine("ok", "Face detection ready");
-  } catch (e) {
-    console.warn("engine", e);
-    setEngine("bad", "Auto-detect unavailable here. Set head boxes by hand (tap a photo).");
-  }
+    return true;
+  } catch (e) { console.warn("engine", e); toast("Auto-detect isn't available here. Set subjects by hand."); return false; }
 })();
-function setEngine(kind, text) { $("engine").innerHTML = `<span class="dot ${kind}"></span><span></span>`; $("engine").lastChild.textContent = text; }
-
-/* ---------------- loading photos */
-function loadImg(file) {
-  return new Promise((res, rej) => {
-    const url = URL.createObjectURL(file);
-    const img = new Image();
-    img.decoding = "async";
-    img.onload = () => res({ img, url });
-    img.onerror = () => rej(new Error("Can't read " + file.name));
-    img.src = url;
-  });
+const lazy = {};
+function task(name) {
+  if (lazy[name]) return lazy[name];
+  lazy[name] = (async () => {
+    if (!(await engineReady)) return null;
+    try {
+      if (name === "pose") return await V.PoseLandmarker.createFromOptions(FS, { baseOptions: { modelAssetPath: MODEL.pose, delegate: "CPU" }, runningMode: "IMAGE", numPoses: 1 });
+      if (name === "object") return await V.ObjectDetector.createFromOptions(FS, { baseOptions: { modelAssetPath: MODEL.object, delegate: "CPU" }, runningMode: "IMAGE", scoreThreshold: 0.35, maxResults: 5 });
+      if (name === "touch") return await V.InteractiveSegmenter.createFromOptions(FS, { baseOptions: { modelAssetPath: MODEL.touch, delegate: "CPU" }, outputCategoryMask: false, outputConfidenceMasks: true });
+    } catch (e) { console.warn(name, e); return null; }
+  })();
+  return lazy[name];
 }
-function scaled(img, W, H, long) {
-  const s = Math.min(1, long / Math.max(W, H));
-  const c = document.createElement("canvas");
-  c.width = Math.max(1, Math.round(W * s)); c.height = Math.max(1, Math.round(H * s));
-  const x = c.getContext("2d", { willReadFrequently: true });
-  x.imageSmoothingQuality = "high";
-  x.drawImage(img, 0, 0, c.width, c.height);
+function detFace(c, s) {
+  if (!E.face) return null;
+  const r = E.face.detect(c);
+  if (!r.detections?.length) return null;
+  const b = r.detections.reduce((a, d) => (d.boundingBox.width * d.boundingBox.height > a.boundingBox.width * a.boundingBox.height ? d : a)).boundingBox;
+  return { cx: (b.originX + b.width / 2) / s, cy: (b.originY + b.height / 2) / s, size: b.height / s, w: b.width / s };
+}
+async function detBody(p) {
+  const t = await task("pose"); if (!t) return null;
+  const lm = t.detect(p.small.c).landmarks?.[0]; if (!lm) return null;
+  const hasVis = lm.some((l) => l.visibility > 0), vis = (k) => (hasVis ? lm[k].visibility : 1);
+  if (vis(11) < 0.2 || vis(12) < 0.2) return null;
+  const a = [lm[11].x * p.W, lm[11].y * p.H], b = [lm[12].x * p.W, lm[12].y * p.H];
+  const size = Math.hypot(a[0] - b[0], a[1] - b[1]);
+  if (size < 8) return null;
+  return { cx: (a[0] + b[0]) / 2, cy: (a[1] + b[1]) / 2, size, w: size, pts: [a, b] };
+}
+async function detObject(p) {
+  const t = await task("object"); if (!t) return null;
+  const ds = t.detect(p.small.c).detections; if (!ds?.length) return null;
+  const sc = (d) => d.boundingBox.width * d.boundingBox.height * (d.categories[0]?.score || 0);
+  const b = ds.reduce((a, d) => (sc(d) > sc(a) ? d : a)).boundingBox, s = p.small.s;
+  return { cx: (b.originX + b.width / 2) / s, cy: (b.originY + b.height / 2) / s, size: b.height / s, w: b.width / s };
+}
+const anchorOf = (p, k = S.kind) => p.manual[k] || p.det[k] || null;
+function guess(p, k = S.kind) {
+  const m = Math.min(p.W, p.H), f = k === "face" ? 0.14 : k === "body" ? 0.3 : 0.4;
+  return { cx: p.W / 2, cy: p.H * (k === "face" ? 0.35 : 0.45), size: m * f, w: m * f, pts: [[p.W / 2 - m * f / 2, p.H * 0.45], [p.W / 2 + m * f / 2, p.H * 0.45]] };
+}
+async function ensureKind(kind) {
+  if (kind === "face") return;
+  const todo = S.photos.filter((p) => !p.tried[kind]); if (!todo.length) return;
+  S.busyText = kind === "body" ? "Finding people…" : "Finding subjects…"; schedule();
+  for (const p of todo) { try { p.det[kind] = kind === "body" ? await detBody(p) : await detObject(p); } catch (e) { console.warn(e); } p.tried[kind] = true; }
+  S.busyText = "";
+}
+async function autoKind() {
+  const P = S.photos, n = (k) => P.filter((p) => anchorOf(p, k)).length;
+  if (n("face") === P.length) { S.kind = "face"; return; }
+  await ensureKind("body");
+  if (n("body") === P.length) { S.kind = "body"; return; }
+  if (n("face") || n("body")) { S.kind = n("face") >= n("body") ? "face" : "body"; return; }
+  await ensureKind("object"); S.kind = "object";
+}
+
+/* ---------- loading: keep small working copies only, never the full decoded photo */
+function loadImg(url) {
+  return new Promise((res, rej) => { const img = new Image(); img.decoding = "async"; img.onload = () => res(img); img.onerror = () => rej(new Error("Can't read photo")); img.src = url; });
+}
+function scaled(img, W, H, long, wide) {
+  const s = Math.min(1, long / Math.max(W, H)), c = mk(Math.max(1, Math.round(W * s)), Math.max(1, Math.round(H * s)));
+  const x = wide ? ctx(c) : c.getContext("2d", { willReadFrequently: true });
+  x.imageSmoothingQuality = "high"; x.drawImage(img, 0, 0, c.width, c.height);
   return { c, s };
 }
 async function makePhoto(file) {
-  const { img, url } = await loadImg(file);
-  const W = img.naturalWidth, H = img.naturalHeight;
-  const small = scaled(img, W, H, SMALL);
-  const mid = scaled(img, W, H, MID);
-  const p = { id: S.nextId++, name: file.name.replace(/\.[^.]+$/, "") || "photo", img, url, W, H, small, mid,
-    data: small.c.getContext("2d").getImageData(0, 0, small.c.width, small.c.height).data, mask: null, face: null, auto: null, source: "none" };
+  const url = URL.createObjectURL(file), img = await loadImg(url), W = img.naturalWidth, H = img.naturalHeight;
+  const small = scaled(img, W, H, SMALL), mid = scaled(img, W, H, MID, true);
+  const p = { id: S.nextId++, name: file.name.replace(/\.[^.]+$/, "") || "photo", url, W, H, small, mid,
+    data: small.c.getContext("2d").getImageData(0, 0, small.c.width, small.c.height).data, mask: null, det: {}, tried: { face: true }, manual: {} };
   await engineReady;
-  if (engine) {
+  try {
+    p.det.face = detFace(small.c, small.s);
+    if (!p.det.face && Math.max(W, H) > SMALL) { const hi = scaled(img, W, H, HI); p.det.face = detFace(hi.c, hi.s); hi.c.width = 0; }
+  } catch (e) { console.warn(e); }
+  if (E.seg) {
     try {
-      const r = engine.face.detect(small.c);
-      if (r.detections && r.detections.length) {
-        const d = r.detections.reduce((a, b) => (b.boundingBox.width * b.boundingBox.height > a.boundingBox.width * a.boundingBox.height ? b : a));
-        const b = d.boundingBox;
-        p.auto = { cx: (b.originX + b.width / 2) / small.s, cy: (b.originY + b.height / 2) / small.s, h: b.height / small.s };
-      }
+      const r = E.seg.segment(small.c), m = r.confidenceMasks?.[0];
+      if (m) { const f = m.getAsFloat32Array(); p.mask = new Uint8Array(f.length); for (let i = 0; i < f.length; i++) p.mask[i] = f[i] * 255; }
+      r.close?.();
     } catch (e) { console.warn(e); }
-    if (engine.seg) {
-      try {
-        const r = engine.seg.segment(small.c);
-        const m = r.confidenceMasks && r.confidenceMasks[0];
-        if (m) { const f = m.getAsFloat32Array(); p.mask = new Uint8Array(f.length); for (let i = 0; i < f.length; i++) p.mask[i] = f[i] * 255; }
-        r.close && r.close();
-      } catch (e) { console.warn(e); }
-    }
   }
-  if (p.auto) { p.face = { ...p.auto }; p.source = "auto"; }
-  else { p.face = { cx: W / 2, cy: H * 0.35, h: Math.min(W, H) * 0.14 }; p.source = "none"; }
+  img.src = "";
   return p;
 }
-
-/* ---------------- layout: copy the reference's head size and position */
-function aspectValue() {
-  if (S.aspect === "orig") return S.ref ? S.ref.W / S.ref.H : 4 / 5;
-  if (S.aspect === "custom") { const w = parseFloat($("cw").value) || 1, h = parseFloat($("ch").value) || 1; return w / h; }
-  const [w, h] = S.aspect.split(":").map(Number); return w / h;
+async function addFiles(files) {
+  if (!files.length) return;
+  let i = 0;
+  for (const f of files) {
+    S.busyText = `Reading ${++i} of ${files.length}…`; schedule();
+    try { S.photos.push(await makePhoto(f)); } catch (e) { console.warn(e); toast(`Couldn't read ${f.name}`); }
+  }
+  if (!S.kindLocked && S.photos.length) await autoKind();
+  S.busyText = ""; schedule();
 }
-function maxCropH(p, a, tx, ty) {
-  const { cx: fx, cy: fy } = p.face;
+
+/* ---------- layout: every photo copies the reference's subject size and spot */
+function aspect() { if (S.aspect === "orig") { const R = S.photos[S.ref]; return R.W / R.H; } const [w, h] = S.aspect.split(":").map(Number); return w / h; }
+function coverCrop(p, a) { const h = Math.min(p.H, p.W / a), w = h * a; return { x: (p.W - w) / 2, y: (p.H - h) / 2, w, h, fill: 0 }; }
+function maxCropH(p, an, a, tx, ty) {
   const lim = [p.H, p.W / a];
-  if (tx > 0) lim.push(fx / (tx * a));
-  if (tx < 1) lim.push((p.W - fx) / ((1 - tx) * a));
-  if (ty > 0) lim.push(fy / ty);
-  if (ty < 1) lim.push((p.H - fy) / (1 - ty));
+  if (tx > 0) lim.push(an.cx / (tx * a)); if (tx < 1) lim.push((p.W - an.cx) / ((1 - tx) * a));
+  if (ty > 0) lim.push(an.cy / ty); if (ty < 1) lim.push((p.H - an.cy) / (1 - ty));
   return Math.max(1, Math.min(...lim));
 }
 function layout() {
-  const a = aspectValue(), R = S.ref, all = [R, ...S.others];
-  const ch0 = Math.min(R.H, R.W / a), cw0 = ch0 * a, x0 = (R.W - cw0) / 2, y0 = (R.H - ch0) / 2;
-  const tx0 = clamp((R.face.cx - x0) / cw0, 0.05, 0.95), ty0 = clamp((R.face.cy - y0) / ch0, 0.05, 0.95);
-  const auto = $("auto").checked;
-  const tx = auto ? tx0 : +$("tx").value, ty = auto ? ty0 : +$("ty").value;
-  const zoom = +$("zoom").value;
-  const want = (R.face.h / ch0) * zoom;
-  let need = 0, limiter = -1;
-  all.forEach((p, i) => { const v = p.face.h / maxCropH(p, a, tx, ty); if (v > need) { need = v; limiter = i; } });
-  const r = Math.max(want, need);
-  const crops = all.map((p) => {
-    const ch = p.face.h / r, cw = ch * a;
-    return { x: clamp(p.face.cx - tx * cw, 0, Math.max(0, p.W - cw)), y: clamp(p.face.cy - ty * ch, 0, Math.max(0, p.H - ch)), w: cw, h: ch };
+  const P = S.photos, a = aspect(), R = P[S.ref], ra = anchorOf(R) || guess(R), c0 = coverCrop(R, a);
+  const tx0 = clamp((ra.cx - c0.x) / c0.w, 0.08, 0.92), ty0 = clamp((ra.cy - c0.y) / c0.h, 0.08, 0.92);
+  const [tx, ty] = S.pos || [tx0, ty0];
+  let r = (ra.size / c0.h) * S.zoom;
+  if (S.edges === "tight") P.forEach((p) => { const an = anchorOf(p) || guess(p); r = Math.max(r, an.size / maxCropH(p, an, a, tx, ty)); });
+  const crops = P.map((p) => {
+    const an = anchorOf(p) || guess(p), h = an.size / r, w = h * a;
+    let x = an.cx - tx * w, y = an.cy - ty * h;
+    if (S.edges === "tight") { x = clamp(x, 0, Math.max(0, p.W - w)); y = clamp(y, 0, Math.max(0, p.H - h)); }
+    const ix = Math.max(0, Math.min(p.W, x + w) - Math.max(0, x)), iy = Math.max(0, Math.min(p.H, y + h) - Math.max(0, y));
+    return { x, y, w, h, fill: 1 - (ix * iy) / (w * h) };
   });
-  return { a, tx, ty, r, crops, limited: need > want * 1.001 ? limiter : -1 };
+  return { a, tx, ty, r, crops };
+}
+function issuesOf(i) {
+  const p = S.photos[i], c = S.lay?.crops[i], out = [];
+  if (!c) return out;
+  if (!anchorOf(p)) out.push({ k: "subj", t: `No ${KN[S.kind].toLowerCase()} found`, a: "Set subject" });
+  if (c.fill > 0.02) out.push({ k: "fill", t: `${Math.round(c.fill * 100)}% of the frame is filled in`, a: "Crop tighter" });
+  if (c.w < 1080) out.push({ k: "res", t: `Only ${Math.round(c.w)} px wide, may look soft on Instagram`, a: null });
+  return out;
 }
 
-/* ---------------- color: Reinhard transfer in CIELAB, stats from background only */
+/* ---------- drawing: one resample from the best source, blurred fill for missing edges */
+function backdrop(p) {
+  if (!p._bd) {
+    const s = 24 / Math.max(p.W, p.H), c = mk(Math.max(2, Math.round(p.W * s)), Math.max(2, Math.round(p.H * s)));
+    const x = c.getContext("2d", { willReadFrequently: true }); x.drawImage(p.small.c, 0, 0, c.width, c.height);
+    const d = x.getImageData(0, 0, c.width, c.height).data; let r = 0, g = 0, b = 0; const n = d.length / 4;
+    for (let i = 0; i < d.length; i += 4) { r += d[i]; g += d[i + 1]; b += d[i + 2]; }
+    p._bd = { c, avg: `rgb(${(r / n) | 0},${(g / n) | 0},${(b / n) | 0})` };
+  }
+  return p._bd;
+}
+function stepDown(src, sx, sy, sw, sh, dw) {
+  let tmp = null;
+  while (sw / 2 >= dw * 1.05 && (sw / 2) * (sh / 2) <= MAX_AREA) {
+    const c = mk(Math.round(sw / 2), Math.round(sh / 2)), x = ctx(c);
+    x.imageSmoothingQuality = "high"; x.drawImage(src, sx, sy, sw, sh, 0, 0, c.width, c.height);
+    if (tmp) tmp.width = 0; tmp = c; src = c; sx = 0; sy = 0; sw = c.width; sh = c.height;
+  }
+  return { src, sx, sy, sw, sh, free: () => { if (tmp) tmp.width = 0; } };
+}
+function paint(x, p, src, sc, crop, w, h, hq) {
+  const k = w / crop.w; x.imageSmoothingEnabled = true; x.imageSmoothingQuality = "high";
+  if (crop.fill > 0.0005) {
+    const bd = backdrop(p), e = 1.3, bw = p.W * k * e, bh = p.H * k * e, cx = (p.W / 2 - crop.x) * k, cy = (p.H / 2 - crop.y) * k;
+    x.fillStyle = bd.avg; x.fillRect(0, 0, w, h); x.drawImage(bd.c, cx - bw / 2, cy - bh / 2, bw, bh);
+  }
+  const sx = Math.max(0, crop.x), sy = Math.max(0, crop.y), ex = Math.min(p.W, crop.x + crop.w), ey = Math.min(p.H, crop.y + crop.h);
+  if (ex <= sx || ey <= sy) return;
+  const SW = src.naturalWidth || src.width, SH = src.naturalHeight || src.height;
+  const ssx = sx * sc, ssy = sy * sc, ssw = Math.min((ex - sx) * sc, SW - ssx), ssh = Math.min((ey - sy) * sc, SH - ssy);
+  const dx = (sx - crop.x) * k, dy = (sy - crop.y) * k, dw = (ex - sx) * k, dh = (ey - sy) * k;
+  if (hq) { const t = stepDown(src, ssx, ssy, ssw, ssh, dw); x.drawImage(t.src, t.sx, t.sy, t.sw, t.sh, dx, dy, dw, dh); t.free(); }
+  else x.drawImage(src, ssx, ssy, ssw, ssh, dx, dy, dw, dh);
+}
+
+/* ---------- color: Reinhard transfer in CIELAB, background stats, subject protected */
 const S2L = new Float32Array(256); for (let i = 0; i < 256; i++) { const c = i / 255; S2L[i] = c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); }
 const L2S = new Uint8ClampedArray(4096); for (let i = 0; i < 4096; i++) { const c = i / 4095; L2S[i] = Math.round(255 * (c <= 0.0031308 ? 12.92 * c : 1.055 * Math.pow(c, 1 / 2.4) - 0.055)); }
 const fLab = (t) => (t > 0.008856 ? Math.cbrt(t) : 7.787 * t + 16 / 116);
-function toLab(r8, g8, b8, out) {
+function toLab(r8, g8, b8, o) {
   const r = S2L[r8], g = S2L[g8], b = S2L[b8];
   const X = (0.4124 * r + 0.3576 * g + 0.1805 * b) / 0.95047, Y = 0.2126 * r + 0.7152 * g + 0.0722 * b, Z = (0.0193 * r + 0.1192 * g + 0.9505 * b) / 1.08883;
-  const fx = fLab(X), fy = fLab(Y), fz = fLab(Z);
-  out[0] = 116 * fy - 16; out[1] = 500 * (fx - fy); out[2] = 200 * (fy - fz);
+  const fx = fLab(X), fy = fLab(Y), fz = fLab(Z); o[0] = 116 * fy - 16; o[1] = 500 * (fx - fy); o[2] = 200 * (fy - fz);
 }
+const inBox = (X, Y, o) => Math.abs(X - o.cx) < (o.w || o.size) / 2 && Math.abs(Y - o.cy) < o.size / 2;
 function labStats(p, crop) {
-  const s = p.small.s, w = p.small.c.width, h = p.small.c.height, d = p.data, m = p.mask;
-  const x0 = Math.floor(crop.x * s), y0 = Math.floor(crop.y * s), x1 = Math.min(w, Math.ceil((crop.x + crop.w) * s)), y1 = Math.min(h, Math.ceil((crop.y + crop.h) * s));
-  const acc = (useMask) => {
+  const s = p.small.s, w = p.small.c.width, h = p.small.c.height, d = p.data, m = p.mask, obj = S.kind === "object" ? anchorOf(p) : null;
+  const x0 = clamp(Math.floor(crop.x * s), 0, w), y0 = clamp(Math.floor(crop.y * s), 0, h);
+  const x1 = clamp(Math.ceil((crop.x + crop.w) * s), 0, w), y1 = clamp(Math.ceil((crop.y + crop.h) * s), 0, h);
+  const acc = (bg) => {
     let n = 0; const sum = [0, 0, 0], sq = [0, 0, 0], lab = [0, 0, 0];
     for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) {
       const i = y * w + x;
-      if (useMask && m[i] > 77) continue;
+      if (bg) { if (obj) { if (inBox(x / s, y / s, obj)) continue; } else if (m && m[i] > 77) continue; }
       toLab(d[i * 4], d[i * 4 + 1], d[i * 4 + 2], lab);
-      for (let k = 0; k < 3; k++) { sum[k] += lab[k]; sq[k] += lab[k] * lab[k]; }
-      n++;
+      for (let k = 0; k < 3; k++) { sum[k] += lab[k]; sq[k] += lab[k] * lab[k]; } n++;
     }
-    return { n, mu: sum.map((v) => v / Math.max(1, n)), sd: sq.map((v, k) => Math.sqrt(Math.max(1e-6, v / Math.max(1, n) - (sum[k] / Math.max(1, n)) ** 2))) };
+    const N = Math.max(1, n);
+    return { n, mu: sum.map((v) => v / N), sd: sq.map((v, k) => Math.sqrt(Math.max(1e-6, v / N - (sum[k] / N) ** 2))) };
   };
-  let st = m ? acc(true) : null;
-  if (!st || st.n < 400) st = acc(false);
+  let st = m || obj ? acc(true) : null; if (!st || st.n < 400) st = acc(false);
   return st;
 }
 function colorParams(lay) {
-  const all = [S.ref, ...S.others];
-  const stats = all.map((p, i) => labStats(p, lay.crops[i]));
-  const R = stats[0];
-  return stats.map((st, i) => i === 0 ? null : { mu: st.mu, mur: R.mu, k: st.sd.map((v, k) => clamp(R.sd[k] / v, 0.6, 1.6)) });
+  if (S.color <= 0) return [];
+  const st = S.photos.map((p, i) => labStats(p, lay.crops[i])), R = st[S.ref];
+  return st.map((s, i) => (i === S.ref ? null : { mu: s.mu, mur: R.mu, k: s.sd.map((v, k) => clamp(R.sd[k] / v, 0.6, 1.6)) }));
 }
-function applyColor(imgData, prm, strength) {
-  if (!prm || strength <= 0) return;
-  const d = imgData.data, lab = [0, 0, 0], { mu, mur, k } = prm;
-  for (let i = 0; i < d.length; i += 4) {
-    toLab(d[i], d[i + 1], d[i + 2], lab);
-    const L = lab[0] + ((lab[0] - mu[0]) * k[0] + mur[0] - lab[0]) * strength;
-    const A = lab[1] + ((lab[1] - mu[1]) * k[1] + mur[1] - lab[1]) * strength;
-    const B = lab[2] + ((lab[2] - mu[2]) * k[2] + mur[2] - lab[2]) * strength;
-    const fy = (L + 16) / 116, fx = fy + A / 500, fz = fy - B / 200;
-    const X = 0.95047 * (fx ** 3 > 0.008856 ? fx ** 3 : (fx - 16 / 116) / 7.787);
-    const Y = fy ** 3 > 0.008856 ? fy ** 3 : (fy - 16 / 116) / 7.787;
-    const Z = 1.08883 * (fz ** 3 > 0.008856 ? fz ** 3 : (fz - 16 / 116) / 7.787);
-    const r = 3.2406 * X - 1.5372 * Y - 0.4986 * Z, g = -0.9689 * X + 1.8758 * Y + 0.0415 * Z, b = 0.0557 * X - 0.2040 * Y + 1.0570 * Z;
-    d[i] = L2S[clamp(Math.round(r * 4095), 0, 4095)]; d[i + 1] = L2S[clamp(Math.round(g * 4095), 0, 4095)]; d[i + 2] = L2S[clamp(Math.round(b * 4095), 0, 4095)];
-  }
-}
-
-/* ---------------- drawing */
-function previewSize(a) { return a < 1 ? [Math.round(PREV * a), PREV] : [PREV, Math.round(PREV / a)]; }
-function drawPreview(p, crop, w, h, canvas) {
-  canvas.width = w; canvas.height = h;
-  const x = canvas.getContext("2d", { willReadFrequently: true });
-  x.imageSmoothingQuality = "high";
-  const s = p.mid.s;
-  x.drawImage(p.mid.c, crop.x * s, crop.y * s, crop.w * s, crop.h * s, 0, 0, w, h);
-  return x;
-}
-function coverCrop(p, a) { // what Instagram would show without this tool: centered crop
-  const ch = Math.min(p.H, p.W / a), cw = ch * a;
-  return { x: (p.W - cw) / 2, y: (p.H - ch) / 2, w: cw, h: ch };
-}
-
-let previews = [];
-let raf = 0;
-function schedule() { cancelAnimationFrame(raf); raf = requestAnimationFrame(() => setTimeout(render, 0)); }
-
-function render() {
-  const ready = S.ref && S.others.length;
-  $("empty").hidden = $("emptyTxt").hidden = !!ready;
-  $("carousel").hidden = $("cmpCard").hidden = !ready;
-  $("exportBtn").disabled = !ready;
-  $("barSum").textContent = ready ? `${S.others.length + 1} photos · ${aspectLabel()}` : (S.ref ? "Add 1+ photos to match" : "Add a reference and 1+ photos");
-  if (!ready) { $("layoutInfo").textContent = ""; return; }
-  const lay = layout(); S.lay = lay;
-  const [pw, ph] = previewSize(lay.a);
-  const all = [S.ref, ...S.others];
-  const params = colorParams(lay), strength = $("strength").value / 100;
-  const car = $("carousel");
-  // reuse frame nodes
-  while (car.children.length > all.length) car.lastChild.remove();
-  previews = all.map((p, i) => {
-    let fr = car.children[i];
-    if (!fr) {
-      fr = document.createElement("div"); fr.className = "frame";
-      fr.innerHTML = `<div class="pic"><canvas></canvas></div><div class="cap"><span></span><button>Head box</button></div>`;
-      car.appendChild(fr);
+function applyColor(id, prm, str, p, crop, w, h) {
+  const d = id.data, lab = [0, 0, 0], { mu, mur, k } = prm, s = p.small.s, mw = p.small.c.width, mh = p.small.c.height, m = p.mask;
+  const prot = S.protect ? 0.65 : 0, obj = S.kind === "object" ? anchorOf(p) : null, kx = crop.w / w, ky = crop.h / h;
+  const weight = (X, Y) => {
+    if (!prot || X < 0 || Y < 0 || X >= p.W || Y >= p.H) return 1;
+    let v = 0;
+    if (obj) { const dx = Math.abs(X - obj.cx) / ((obj.w || obj.size) / 2), dy = Math.abs(Y - obj.cy) / (obj.size / 2); v = clamp((1.15 - Math.max(dx, dy)) / 0.3, 0, 1); }
+    else if (m) {
+      const u = clamp(X * s - 0.5, 0, mw - 1), q = clamp(Y * s - 0.5, 0, mh - 1), x0 = u | 0, y0 = q | 0;
+      const x1 = Math.min(mw - 1, x0 + 1), y1 = Math.min(mh - 1, y0 + 1), a = u - x0, b = q - y0;
+      v = ((m[y0 * mw + x0] * (1 - a) + m[y0 * mw + x1] * a) * (1 - b) + (m[y1 * mw + x0] * (1 - a) + m[y1 * mw + x1] * a) * b) / 255;
     }
-    const cv = fr.querySelector("canvas");
-    const x = drawPreview(p, lay.crops[i], pw, ph, cv);
-    if (params[i] && strength > 0) { const id = x.getImageData(0, 0, pw, ph); applyColor(id, params[i], strength); x.putImageData(id, 0, 0); }
-    fr.querySelector(".cap span").textContent = i === 0 ? "Reference" : `Photo ${i + 1}`;
-    fr.querySelector(".cap button").onclick = () => openEditor(p);
-    const pic = fr.querySelector(".pic");
-    pic.querySelectorAll(".guide").forEach((g) => g.remove());
-    if ($("guides").checked) {
-      [lay.ty - lay.r / 2, lay.ty + lay.r / 2].forEach((y) => { const g = document.createElement("div"); g.className = "guide"; g.style.top = (y * 100) + "%"; pic.appendChild(g); });
-      const v = document.createElement("div"); v.className = "guide v"; v.style.left = (lay.tx * 100) + "%"; pic.appendChild(v);
-    }
-    return cv;
-  });
-  if ($("auto").checked) { $("tx").value = lay.tx; $("ty").value = lay.ty; }
-  $("txV").textContent = Math.round(lay.tx * 100) + "%"; $("tyV").textContent = Math.round(lay.ty * 100) + "%";
-  let info = `Head height ${(lay.r * 100).toFixed(1)}% of the frame in every photo.`;
-  if (lay.limited > 0) info += ` The reference was zoomed in so Photo ${lay.limited + 1} fits (its subject is bigger or near an edge).`;
-  const minW = Math.min(...lay.crops.map((c) => c.w));
-  if (minW < 1080) info += ` Smallest crop is ${Math.round(minW)}px wide, under Instagram’s 1080px, so it may look soft.`;
-  $("layoutInfo").textContent = info;
-  renderCompare();
-  updateExportInfo();
-}
-
-/* ---------------- compare slider */
-let cmpPos = 0.5;
-function renderCompare() {
-  if (!S.lay || !S.others.length) return;
-  S.cmp = clamp(S.cmp, 0, S.others.length - 1);
-  const pick = $("cmpPick");
-  pick.innerHTML = "";
-  S.others.forEach((p, i) => {
-    const b = document.createElement("button"); b.className = "chip"; b.textContent = `Photo ${i + 2}`;
-    b.setAttribute("aria-pressed", i === S.cmp); b.onclick = () => { S.cmp = i; renderCompare(); };
-    pick.appendChild(b);
-  });
-  const after = previews[S.cmp + 1];
-  const A = $("cmpAfter"), B = $("cmpBefore");
-  A.width = after.width; A.height = after.height; A.getContext("2d").drawImage(after, 0, 0);
-  if (S.vs === "ref") {
-    B.width = A.width; B.height = A.height; B.getContext("2d").drawImage(previews[0], 0, 0);
-    $("tagL").textContent = "Reference";
-  } else {
-    const p = S.others[S.cmp];
-    drawPreview(p, coverCrop(p, S.lay.a), A.width, A.height, B);
-    $("tagL").textContent = "Original";
-  }
-  setCmp(cmpPos);
-}
-function setCmp(v) {
-  cmpPos = clamp(v, 0, 1);
-  $("cmpAfter").style.clipPath = `inset(0 0 0 ${cmpPos * 100}%)`;
-  $("handle").style.left = (cmpPos * 100) + "%";
-}
-(() => {
-  const el = $("compare"); let drag = false, startX = 0, startY = 0, decided = false;
-  const at = (e) => { const r = el.getBoundingClientRect(); setCmp((e.clientX - r.left) / r.width); };
-  el.addEventListener("pointerdown", (e) => { drag = true; decided = e.pointerType !== "touch"; startX = e.clientX; startY = e.clientY; if (decided) { el.setPointerCapture(e.pointerId); at(e); } });
-  el.addEventListener("pointermove", (e) => {
-    if (!drag) return;
-    if (!decided) {
-      const dx = Math.abs(e.clientX - startX), dy = Math.abs(e.clientY - startY);
-      if (dx < 6 && dy < 6) return;
-      if (dy > dx) { drag = false; return; }
-      decided = true; el.setPointerCapture(e.pointerId);
-    }
-    at(e);
-  });
-  const end = (e) => { if (drag && !decided) at(e); drag = false; };
-  el.addEventListener("pointerup", end); el.addEventListener("pointercancel", () => { drag = false; });
-  el.tabIndex = 0;
-  el.setAttribute("role", "slider"); el.setAttribute("aria-label", "Before and after divider");
-  el.addEventListener("keydown", (e) => { if (e.key === "ArrowLeft") setCmp(cmpPos - 0.05); if (e.key === "ArrowRight") setCmp(cmpPos + 0.05); });
-})();
-$("vsOrig").onclick = () => { S.vs = "orig"; $("vsOrig").setAttribute("aria-pressed", true); $("vsRef").setAttribute("aria-pressed", false); renderCompare(); };
-$("vsRef").onclick = () => { S.vs = "ref"; $("vsRef").setAttribute("aria-pressed", true); $("vsOrig").setAttribute("aria-pressed", false); renderCompare(); };
-
-/* ---------------- slots */
-function badge(p) { return p.source === "none" ? `<span class="badge bad">Set head</span>` : p.source === "manual" ? `<span class="badge">Manual</span>` : ""; }
-function drawSlots() {
-  const R = S.ref;
-  if (R) {
-    $("refSlot").innerHTML = `<img alt="Reference photo" src="${R.url}">${badge(R)}`;
-    $("refSlot").style.borderStyle = "solid";
-    $("refInfo").textContent = `${R.W}×${R.H}px · ${R.source === "auto" ? "face found" : R.source === "manual" ? "head box set by hand" : "no face found, set the head box"}`;
-    $("refActs").hidden = false;
-  }
-  const t = $("thumbs");
-  t.querySelectorAll(".thumb").forEach((n) => n.remove());
-  S.others.forEach((p, i) => {
-    const d = document.createElement("div"); d.className = "thumb";
-    d.innerHTML = `<button class="slot" aria-label="Adjust head box for photo ${i + 2}"><img alt="" src="${p.url}">${badge(p)}</button><button class="x" aria-label="Remove photo ${i + 2}">×</button>`;
-    d.querySelector(".slot").onclick = () => openEditor(p);
-    d.querySelector(".x").onclick = () => { URL.revokeObjectURL(p.url); S.others.splice(i, 1); drawSlots(); schedule(); };
-    t.insertBefore(d, $("addSlot"));
-  });
-  $("fixCount").textContent = S.others.length ? `${S.others.length} photo${S.others.length > 1 ? "s" : ""}` : "none yet";
-}
-$("refSlot").onclick = $("refChange").onclick = () => $("refFile").click();
-$("refHead").onclick = () => S.ref && openEditor(S.ref);
-$("addSlot").onclick = () => $("fixFile").click();
-$("refFile").onchange = async (e) => {
-  const f = e.target.files[0]; e.target.value = ""; if (!f) return;
-  $("refInfo").textContent = "Reading photo…";
-  try { const p = await makePhoto(f); if (S.ref) URL.revokeObjectURL(S.ref.url); S.ref = p; }
-  catch (err) { $("refInfo").textContent = err.message; return; }
-  drawSlots(); schedule();
-};
-$("fixFile").onchange = async (e) => {
-  const files = [...e.target.files]; e.target.value = "";
-  for (const f of files) {
-    $("fixCount").textContent = `reading ${f.name}…`;
-    try { S.others.push(await makePhoto(f)); } catch (err) { console.warn(err); }
-    drawSlots();
-  }
-  schedule();
-};
-
-/* ---------------- head box editor */
-let edP = null;
-function openEditor(p) {
-  edP = p; $("sheet").hidden = false;
-  const img = $("edImg"); img.src = p.url;
-  img.onload = placeBox; if (img.complete) placeBox();
-}
-function placeBox() {
-  const img = $("edImg"), k = img.clientWidth / edP.W, f = edP.face, box = $("edBox");
-  const side = f.h * k;
-  box.style.width = box.style.height = side + "px";
-  box.style.left = (f.cx * k - side / 2) + "px"; box.style.top = (f.cy * k - side / 2) + "px";
-}
-(() => {
-  let mode = null, sx = 0, sy = 0, f0 = null;
-  const down = (m) => (e) => { e.preventDefault(); e.stopPropagation(); mode = m; sx = e.clientX; sy = e.clientY; f0 = { ...edP.face }; e.target.setPointerCapture(e.pointerId); };
-  $("edBox").addEventListener("pointerdown", down("move"));
-  $("edRz").addEventListener("pointerdown", down("size"));
-  const move = (e) => {
-    if (!mode) return;
-    const k = $("edImg").clientWidth / edP.W, dx = (e.clientX - sx) / k, dy = (e.clientY - sy) / k;
-    if (mode === "move") edP.face = { ...f0, cx: clamp(f0.cx + dx, 0, edP.W), cy: clamp(f0.cy + dy, 0, edP.H) };
-    else edP.face = { ...f0, h: clamp(f0.h + Math.max(dx, dy) * 2, 12, Math.min(edP.W, edP.H)) };
-    edP.source = "manual"; placeBox();
+    return 1 - prot * v;
   };
-  $("edBox").addEventListener("pointermove", move); $("edRz").addEventListener("pointermove", move);
-  const up = () => { mode = null; };
-  $("edBox").addEventListener("pointerup", up); $("edRz").addEventListener("pointerup", up);
+  for (let y = 0, i = 0; y < h; y++) {
+    const Y = crop.y + (y + 0.5) * ky;
+    for (let x = 0; x < w; x++, i += 4) {
+      const t = str * weight(crop.x + (x + 0.5) * kx, Y); if (t < 0.002) continue;
+      toLab(d[i], d[i + 1], d[i + 2], lab);
+      const L = lab[0] + ((lab[0] - mu[0]) * k[0] + mur[0] - lab[0]) * t;
+      const A = lab[1] + ((lab[1] - mu[1]) * k[1] + mur[1] - lab[1]) * t;
+      const B = lab[2] + ((lab[2] - mu[2]) * k[2] + mur[2] - lab[2]) * t;
+      const fy = (L + 16) / 116, fx = fy + A / 500, fz = fy - B / 200;
+      const X = 0.95047 * (fx ** 3 > 0.008856 ? fx ** 3 : (fx - 16 / 116) / 7.787);
+      const Yv = fy ** 3 > 0.008856 ? fy ** 3 : (fy - 16 / 116) / 7.787;
+      const Z = 1.08883 * (fz ** 3 > 0.008856 ? fz ** 3 : (fz - 16 / 116) / 7.787);
+      const r = 3.2406 * X - 1.5372 * Yv - 0.4986 * Z, g = -0.9689 * X + 1.8758 * Yv + 0.0415 * Z, b = 0.0557 * X - 0.204 * Yv + 1.057 * Z;
+      d[i] = L2S[clamp(Math.round(r * 4095), 0, 4095)]; d[i + 1] = L2S[clamp(Math.round(g * 4095), 0, 4095)]; d[i + 2] = L2S[clamp(Math.round(b * 4095), 0, 4095)];
+    }
+  }
+}
+
+/* ---------- render */
+const prevSize = (a, L) => (a < 1 ? [Math.round(L * a), L] : [L, Math.round(L / a)]);
+function renderPreview(p, i, cv, w, h) {
+  cv.width = w; cv.height = h; const x = ctx(cv, true); x.clearRect(0, 0, w, h);
+  paint(x, p, p.mid.c, p.mid.s, S.lay.crops[i], w, h, false);
+  const prm = S.params[i];
+  if (prm && !S.fast) { const id = x.getImageData(0, 0, w, h); applyColor(id, prm, S.color / 100, p, S.lay.crops[i], w, h); x.putImageData(id, 0, 0); }
+}
+let raf = 0;
+function schedule() { cancelAnimationFrame(raf); raf = requestAnimationFrame(render); }
+function render() {
+  const has = S.photos.length > 0;
+  $("empty").hidden = has; $("app").hidden = !has;
+  if (!has) return;
+  S.cur = clamp(S.cur, 0, S.photos.length - 1); S.ref = clamp(S.ref, 0, S.photos.length - 1);
+  S.lay = layout(); S.params = colorParams(S.lay);
+  drawStrip(); drawPanel(); drawStatus(); fit();
+  $("viewBtn").innerHTML = ic(S.view === "grid" ? "single" : "grid");
+  $("viewBtn").setAttribute("aria-label", S.view === "grid" ? "Edit one photo" : "Show all photos");
+  if (S.view === "grid") drawGrid(); else drawOne();
+}
+function fit() {
+  const top = $("top").getBoundingClientRect().bottom + 10, bottom = $("dock").getBoundingClientRect().top - 10;
+  const aw = innerWidth - 24, ah = Math.max(140, bottom - top), a = S.lay.a;
+  let w = aw, h = w / a; if (h > ah) { h = ah; w = h * a; }
+  const f = $("frame"); f.style.width = w + "px"; f.style.height = h + "px"; f.style.top = top + (ah - h) / 2 + "px";
+  const g = $("grid"); g.style.top = top + "px"; g.style.height = ah + "px";
+}
+function drawOne() {
+  $("frame").hidden = false; $("grid").hidden = true;
+  const p = S.photos[S.cur], [w, h] = prevSize(S.lay.a, PREV), cv = $("pv");
+  if (S.comparing) { cv.width = w; cv.height = h; const x = ctx(cv); paint(x, p, p.mid.c, p.mid.s, coverCrop(p, S.lay.a), w, h, false); }
+  else renderPreview(p, S.cur, cv, w, h);
+  const gh = $("gh"); gh.hidden = !S.ghost || S.cur === S.ref || S.comparing;
+  if (!gh.hidden) renderPreview(S.photos[S.ref], S.ref, gh, w, h);
+  $("ghostBtn").setAttribute("aria-pressed", S.ghost);
+  const tag = $("tag"); tag.hidden = !(S.comparing || S.cur === S.ref);
+  tag.textContent = S.comparing ? "Original" : "Reference";
+  drawGuides(); drawBanner();
+}
+function drawGuides() {
+  const g = $("guides"); g.innerHTML = "";
+  if (!S.guides || S.comparing) return;
+  const f = $("frame"), W = f.clientWidth, H = f.clientHeight, L = S.lay, s = L.r * H, cx = L.tx * W, cy = L.ty * H, e = document.createElement("div");
+  if (S.kind === "body") { e.className = "g-line"; e.style.cssText = `left:${cx - s / 2}px;top:${cy}px;width:${s}px`; }
+  else {
+    const R = S.photos[S.ref], an = anchorOf(R) || guess(R), bw = S.kind === "object" ? (s * (an.w || an.size)) / an.size : s;
+    e.className = "g-box" + (S.kind === "face" ? " round" : ""); e.style.cssText = `left:${cx - bw / 2}px;top:${cy - s / 2}px;width:${bw}px;height:${s}px`;
+  }
+  g.appendChild(e);
+}
+function drawBanner() {
+  const b = $("banner"), iss = S.comparing ? [] : issuesOf(S.cur);
+  b.hidden = !iss.length; if (!iss.length) return;
+  const it = iss[0]; $("bTxt").textContent = it.t; b.classList.toggle("warn", it.k !== "fill");
+  const a = $("bAct"); a.hidden = !it.a; a.textContent = it.a || "";
+  a.onclick = () => { if (it.k === "subj") openEditor(S.cur); else if (it.k === "fill") { S.edges = "tight"; schedule(); } };
+}
+function drawGrid() {
+  $("frame").hidden = true; const g = $("grid"); g.hidden = false;
+  const [w, h] = prevSize(S.lay.a, 520);
+  while (g.children.length > S.photos.length) g.lastChild.remove();
+  S.photos.forEach((p, i) => {
+    let c = g.children[i];
+    if (!c) { c = document.createElement("button"); c.className = "cell"; c.innerHTML = `<canvas></canvas><span class="glass tag"></span>`; g.appendChild(c); }
+    c.onclick = () => { S.cur = i; S.view = "one"; schedule(); };
+    renderPreview(p, i, c.querySelector("canvas"), w, h);
+    const iss = issuesOf(i), t = c.querySelector(".tag");
+    t.textContent = i === S.ref ? "Reference" : iss[0]?.t || `Photo ${i + 1}`;
+    t.classList.toggle("warn", i !== S.ref && iss.length > 0 && iss[0].k !== "fill");
+  });
+}
+function drawStrip() {
+  const st = $("strip");
+  S.photos.forEach((p, i) => {
+    if (!p.el) {
+      p.el = document.createElement("button"); p.el.className = "th";
+      p.el.innerHTML = `<img alt=""><span class="b-ref">${ic("star")}</span><span class="b-warn">!</span><span class="b-px"></span>`;
+      p.el.querySelector("img").src = p.url;
+      p.el.onclick = () => { S.cur = S.photos.indexOf(p); S.view = "one"; schedule(); };
+    }
+    const iss = issuesOf(i), res = iss.find((x) => x.k === "res"), px = p.el.querySelector(".b-px");
+    p.el.classList.toggle("on", i === S.cur && S.view === "one");
+    p.el.querySelector(".b-ref").hidden = i !== S.ref;
+    p.el.querySelector(".b-warn").hidden = !iss.some((x) => x.k === "subj");
+    px.hidden = !res; if (res) px.textContent = Math.round(S.lay.crops[i].w) + "px";
+    p.el.setAttribute("aria-label", `Photo ${i + 1}${i === S.ref ? ", reference" : ""}${iss.length ? ". " + iss.map((x) => x.t).join(". ") : ""}`);
+    if (st.children[i] !== p.el) st.insertBefore(p.el, st.children[i] || null);
+  });
+  [...st.querySelectorAll(".th:not(.add)")].forEach((el) => { if (!S.photos.some((p) => p.el === el)) el.remove(); });
+  let add = $("addTile");
+  if (!add) { add = document.createElement("button"); add.id = "addTile"; add.className = "th add"; add.setAttribute("aria-label", "Add photos"); add.innerHTML = ic("plus"); add.onclick = () => $("file").click(); }
+  st.appendChild(add);
+}
+function drawStatus() {
+  const b = $("status");
+  if (S.busyText) { b.textContent = S.busyText; b.className = "glass pill"; b.onclick = null; return; }
+  const need = S.photos.map((_, i) => i).filter((i) => issuesOf(i).some((x) => x.k === "subj"));
+  if (need.length) {
+    b.textContent = `${need.length} ${need.length > 1 ? "need" : "needs"} a subject`; b.className = "glass pill warn";
+    b.onclick = () => { S.cur = need.find((i) => i > S.cur) ?? need[0]; S.view = "one"; S.tab = "subj"; schedule(); };
+  } else { b.textContent = `${S.photos.length} photos · ${S.aspect === "orig" ? "original ratio" : S.aspect}`; b.className = "glass pill"; b.onclick = null; }
+}
+function setSeg(id, v) { $(id).querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", b.dataset.v === v)); }
+function drawPanel() {
+  document.querySelectorAll("#panel section").forEach((s) => (s.hidden = s.dataset.p !== S.tab));
+  document.querySelectorAll("#tabs .tab").forEach((t) => t.classList.toggle("on", t.dataset.t === S.tab));
+  $("ratios").querySelectorAll(".chip").forEach((c) => c.setAttribute("aria-pressed", c.dataset.v === S.aspect));
+  $("zoom").value = S.zoom; $("zoomV").textContent = S.zoom.toFixed(2) + "×";
+  setSeg("edges", S.edges); setSeg("protect", S.protect ? "1" : "0"); setSeg("kinds", S.kind);
+  $("col").value = S.color; $("colV").textContent = S.color + "%";
+  $("posReset").setAttribute("aria-pressed", !S.pos); $("guidesBtn").setAttribute("aria-pressed", S.guides);
+  const P = S.photos;
+  ["face", "body", "object"].forEach((k) => {
+    const n = P.filter((p) => anchorOf(p, k)).length, tried = P.every((p) => p.tried[k]);
+    $("kinds").querySelector(`[data-v=${k}]`).textContent = KN[k] + (tried ? ` ${n}/${P.length}` : "");
+  });
+  const p = P[S.cur], kn = KN[S.kind].toLowerCase();
+  $("subjInfo").textContent = `Photo ${S.cur + 1}${S.cur === S.ref ? " (reference)" : ""}: ` +
+    (p.manual[S.kind] ? `${kn} set by hand.` : anchorOf(p) ? `${kn} found automatically.` : `no ${kn} found. Tap Edit subject.`);
+  $("refBtn").hidden = S.cur === S.ref; $("rmBtn").hidden = P.length < 2;
+}
+
+/* ---------- subject editor */
+let ED = null;
+function openEditor(i) {
+  const p = S.photos[i], k = S.kind, an = anchorOf(p, k) || guess(p, k);
+  ED = { p, k, cx: an.cx, cy: an.cy, size: an.size, w: an.w || an.size, pts: (an.pts || guess(p, "body").pts).map((q) => [...q]) };
+  $("sheet").hidden = false; $("edT").textContent = `${KN[k]} · photo ${i + 1}`;
+  $("edHint").textContent = k === "face" ? "Drag the box over the face, forehead to chin. Drag the dot to resize."
+    : k === "body" ? "Drag the two dots onto the shoulders." : "Tap the subject to select it, or drag the box around it.";
+  $("edBox").hidden = k === "body"; $("edLine").hidden = k !== "body"; $("edBox").classList.toggle("round", k === "face");
+  const img = $("edImg"); img.onload = placeEd; img.src = p.url; if (img.complete) placeEd();
+}
+function placeEd() {
+  const img = $("edImg"), k = img.clientWidth / ED.p.W;
+  if (ED.k === "body") {
+    const svg = $("edSvg"), [a, b] = ED.pts, L = $("edL");
+    svg.setAttribute("width", img.clientWidth); svg.setAttribute("height", img.clientHeight);
+    L.setAttribute("x1", a[0] * k); L.setAttribute("y1", a[1] * k); L.setAttribute("x2", b[0] * k); L.setAttribute("y2", b[1] * k);
+    document.querySelectorAll("#edLine .h").forEach((h, i) => { h.style.left = ED.pts[i][0] * k + "px"; h.style.top = ED.pts[i][1] * k + "px"; });
+  } else {
+    const b = $("edBox"), bw = (ED.k === "object" ? ED.w : ED.size) * k, bh = ED.size * k;
+    Object.assign(b.style, { width: bw + "px", height: bh + "px", left: ED.cx * k - bw / 2 + "px", top: ED.cy * k - bh / 2 + "px" });
+  }
+}
+async function tapSelect(nx, ny) {
+  const t = await task("touch"); if (!t) { toast("Tap to select isn't available here. Drag the box instead."); return; }
+  const p = ED.p, c = p.small.c; $("edHint").textContent = "Selecting…";
+  t.segment(c, { keypoint: { x: nx, y: ny } }, (res) => {
+    const ms = res.confidenceMasks; if (!ms?.length) return;
+    const f = ms[ms.length - 1].getAsFloat32Array(), w = c.width, h = c.height;
+    let x0 = w, y0 = h, x1 = -1, y1 = -1;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (f[y * w + x] > 0.5) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+    if (x1 < 0) return;
+    const s = p.small.s; ED.cx = (x0 + x1 + 1) / 2 / s; ED.cy = (y0 + y1 + 1) / 2 / s; ED.size = (y1 - y0 + 1) / s; ED.w = (x1 - x0 + 1) / s;
+  });
+  $("edHint").textContent = "Tap somewhere else to reselect, or drag the box."; placeEd();
+}
+(() => {
+  const ed = $("editor"); let m = null;
+  ed.addEventListener("pointerdown", async (e) => {
+    const t = e.target;
+    if (t.classList.contains("rz")) m = { t: "size" };
+    else if (t.id === "edBox") m = { t: "move" };
+    else if (t.classList.contains("h")) m = { t: "pt", i: +t.dataset.i };
+    else if (ED.k === "object") { const r = $("edImg").getBoundingClientRect(); await tapSelect((e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height); return; }
+    else return;
+    e.preventDefault(); Object.assign(m, { x: e.clientX, y: e.clientY, s: { cx: ED.cx, cy: ED.cy, size: ED.size, w: ED.w, pts: ED.pts.map((q) => [...q]) } });
+    ed.setPointerCapture(e.pointerId);
+  });
+  ed.addEventListener("pointermove", (e) => {
+    if (!m) return;
+    const k = $("edImg").clientWidth / ED.p.W, dx = (e.clientX - m.x) / k, dy = (e.clientY - m.y) / k, P = ED.p, big = Math.max(P.W, P.H);
+    if (m.t === "move") { ED.cx = clamp(m.s.cx + dx, 0, P.W); ED.cy = clamp(m.s.cy + dy, 0, P.H); }
+    else if (m.t === "size") {
+      if (ED.k === "object") { ED.size = clamp(m.s.size + dy * 2, 12, big); ED.w = clamp(m.s.w + dx * 2, 12, big); }
+      else { ED.size = ED.w = clamp(m.s.size + Math.max(dx, dy) * 2, 12, Math.min(P.W, P.H)); }
+    } else ED.pts[m.i] = [clamp(m.s.pts[m.i][0] + dx, 0, P.W), clamp(m.s.pts[m.i][1] + dy, 0, P.H)];
+    placeEd();
+  });
+  const up = () => { m = null; }; ed.addEventListener("pointerup", up); ed.addEventListener("pointercancel", up);
 })();
-$("edReset").onclick = () => {
-  if (edP.auto) { edP.face = { ...edP.auto }; edP.source = "auto"; }
-  else { edP.face = { cx: edP.W / 2, cy: edP.H * 0.35, h: Math.min(edP.W, edP.H) * 0.14 }; edP.source = "none"; }
-  placeBox();
+$("edDone").onclick = () => {
+  const p = ED.p;
+  if (ED.k === "body") { const [a, b] = ED.pts, d = Math.hypot(a[0] - b[0], a[1] - b[1]); p.manual.body = { cx: (a[0] + b[0]) / 2, cy: (a[1] + b[1]) / 2, size: d, w: d, pts: ED.pts }; }
+  else p.manual[ED.k] = { cx: ED.cx, cy: ED.cy, size: ED.size, w: ED.w };
+  $("sheet").hidden = true; schedule();
 };
-$("edDone").onclick = () => { $("sheet").hidden = true; drawSlots(); schedule(); };
-$("sheet").addEventListener("click", (e) => { if (e.target === $("sheet")) $("edDone").onclick(); });
+$("edCancel").onclick = () => { $("sheet").hidden = true; };
+$("edReset").onclick = () => {
+  delete ED.p.manual[ED.k];
+  const an = ED.p.det[ED.k] || guess(ED.p, ED.k);
+  Object.assign(ED, { cx: an.cx, cy: an.cy, size: an.size, w: an.w || an.size, pts: (an.pts || guess(ED.p, "body").pts).map((q) => [...q]) });
+  placeEd();
+};
 
-/* ---------------- controls */
-const ASPECTS = [["orig", "Original"], ["4:5", "4:5"], ["1:1", "1:1"], ["3:4", "3:4"], ["2:3", "2:3"], ["9:16", "9:16"], ["3:2", "3:2"], ["16:9", "16:9"], ["custom", "Custom"]];
-function aspectLabel() { return S.aspect === "orig" ? "original ratio" : S.aspect === "custom" ? `${$("cw").value}:${$("ch").value}` : S.aspect; }
-ASPECTS.forEach(([v, l]) => {
-  const b = document.createElement("button"); b.className = "chip"; b.textContent = l; b.setAttribute("aria-pressed", v === S.aspect);
-  b.onclick = () => { S.aspect = v; $("aspects").querySelectorAll(".chip").forEach((c) => c.setAttribute("aria-pressed", c === b)); $("custom").hidden = v !== "custom"; schedule(); };
-  $("aspects").appendChild(b);
-});
-const WIDTHS = [["full", "Full"], ["2160", "2160"], ["1440", "1440"], ["1080", "1080"]];
-WIDTHS.forEach(([v, l]) => {
-  const b = document.createElement("button"); b.className = "chip"; b.textContent = l; b.setAttribute("aria-pressed", v === S.width);
-  b.onclick = () => { S.width = v; $("widths").querySelectorAll(".chip").forEach((c) => c.setAttribute("aria-pressed", c === b)); updateExportInfo(); };
-  $("widths").appendChild(b);
-});
-$("fmt").querySelectorAll("button").forEach((b) => b.onclick = () => {
-  S.fmt = b.dataset.v; $("fmt").querySelectorAll("button").forEach((c) => c.setAttribute("aria-pressed", c === b));
-  $("qField").hidden = S.fmt === "image/png"; updateExportInfo();
-});
-(() => { const c = document.createElement("canvas"); c.width = c.height = 2; if (!c.toDataURL("image/webp").startsWith("data:image/webp")) $("webpBtn").hidden = true; })();
-$("zoom").oninput = () => { $("zoomV").textContent = (+$("zoom").value).toFixed(2) + "×"; schedule(); };
-$("strength").oninput = () => { $("strV").textContent = $("strength").value + "%"; schedule(); };
-$("quality").oninput = () => { $("qV").textContent = $("quality").value; };
-$("auto").onchange = () => { $("tx").disabled = $("ty").disabled = $("auto").checked; schedule(); };
-$("tx").oninput = $("ty").oninput = schedule;
-$("cw").oninput = $("ch").oninput = schedule;
-$("guides").onchange = schedule;
-
-/* ---------------- export */
-function outSize(crop) {
-  let w = S.width === "full" ? crop.w : +S.width, h = w / (crop.w / crop.h);
+/* ---------- export */
+const PRESETS = [["ig", "Instagram"], ["uniform", "Same size, sharpest"], ["full", "Full resolution"], ["custom", "Custom"]];
+function outSize(crop, lay) {
+  const minW = Math.min(...lay.crops.map((c) => c.w));
+  let w = S.preset === "ig" ? 1080 : S.preset === "uniform" ? minW : S.preset === "custom" && S.width !== "full" ? +S.width : crop.w, h = w / lay.a;
   if (w * h > MAX_AREA) { const k = Math.sqrt(MAX_AREA / (w * h)); w *= k; h *= k; }
   return [Math.max(1, Math.round(w)), Math.max(1, Math.round(h))];
 }
-function updateExportInfo() {
-  if (!S.lay) return;
-  const sizes = S.lay.crops.map(outSize);
-  const ext = { "image/jpeg": "JPEG", "image/png": "PNG", "image/webp": "WebP" }[S.fmt];
-  const list = sizes.map(([w, h]) => `${w}×${h}`).join(", ");
-  const up = S.width !== "full" && S.lay.crops.some((c) => c.w < +S.width);
-  $("expInfo").textContent = `${ext} · ${list}px.` + (S.width === "full" ? " Each crop keeps its own full resolution (sharpest)." : "") + (up ? " Some photos will be upscaled to reach this width." : "");
+function renderExp() {
+  const lay = (S.lay = layout()), ws = lay.crops.map((c) => c.w), mn = Math.round(Math.min(...ws)), mx = Math.round(Math.max(...ws));
+  const up = ws.filter((w) => w < 1080).length;
+  const desc = {
+    ig: `1080 px wide, JPEG.${up ? ` ${up} photo${up > 1 ? "s" : ""} will be upscaled.` : ""}`,
+    uniform: `${mn} px wide, JPEG. Nothing is upscaled.`,
+    full: `${mn === mx ? mn : mn + "–" + mx} px wide, JPEG. Every pixel is kept.`,
+    custom: "Pick format, quality and width.",
+  };
+  const box = $("presets"); box.innerHTML = "";
+  PRESETS.forEach(([v, t]) => {
+    const b = document.createElement("button"); b.className = "opt"; b.setAttribute("aria-pressed", S.preset === v);
+    b.innerHTML = "<strong></strong><span></span>"; b.firstChild.textContent = t; b.lastChild.textContent = desc[v];
+    b.onclick = () => { S.preset = v; renderExp(); }; box.appendChild(b);
+  });
+  $("custom").hidden = S.preset !== "custom"; setSeg("fmt", S.fmt);
+  $("q").value = S.q; $("qV").textContent = S.q; $("qRow").hidden = S.fmt === "image/png";
+  $("widths").querySelectorAll(".chip").forEach((c) => c.setAttribute("aria-pressed", c.dataset.v === S.width));
+  $("expNote").textContent = `Location and camera data are removed.${P3 ? " Colors stay in Display P3." : ""}`;
+  $("expGo").textContent = `Export ${S.photos.length} photos`; $("expGo").disabled = false;
 }
-function drawHQ(p, crop, w, h) {
-  // step down by halves for clean downscaling, straight from the full-res photo
-  let src = p.img, sx = crop.x, sy = crop.y, sw = crop.w, sh = crop.h, tmp = null;
-  while (sw / 2 >= w * 1.05 && (sw / 2) * (sh / 2) <= MAX_AREA) {
-    const c = document.createElement("canvas"); c.width = Math.round(sw / 2); c.height = Math.round(sh / 2);
-    const x = c.getContext("2d"); x.imageSmoothingQuality = "high"; x.drawImage(src, sx, sy, sw, sh, 0, 0, c.width, c.height);
-    if (tmp) tmp.width = 0;
-    tmp = c; src = c; sx = 0; sy = 0; sw = c.width; sh = c.height;
-  }
-  const out = document.createElement("canvas"); out.width = w; out.height = h;
-  const x = out.getContext("2d", { willReadFrequently: true }); x.imageSmoothingQuality = "high";
-  x.drawImage(src, sx, sy, sw, sh, 0, 0, w, h);
-  if (tmp) tmp.width = 0;
-  return { out, x };
-}
-const toBlob = (c, type, q) => new Promise((res) => c.toBlob(res, type, q));
 let outputs = [];
-let downloads = null;
-(async () => { try { downloads = window.claude ? await window.claude.use("downloads") : null; } catch { downloads = null; } })();
-
-async function saveFile(name, blob, btn) {
-  if (downloads) {
-    try { await downloads.save({ filename: name, data: blob }); btn && (btn.textContent = "Saved"); }
-    catch (e) { if (btn) btn.textContent = e && e.code === "declined" ? "Save" : "Couldn't save"; }
-  } else {
-    // iPhone/Android: the share sheet offers "Save Image" straight to Photos
-    const file = new File([blob], name, { type: blob.type || "application/octet-stream" });
-    if (navigator.canShare && navigator.canShare({ files: [file] })) {
-      try { await navigator.share({ files: [file] }); btn && (btn.textContent = "Saved"); return; }
-      catch (e) { if (e && e.name === "AbortError") return; }
-    }
-    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name; a.click();
+async function doExport() {
+  const go = $("expGo"); go.disabled = true;
+  outputs.forEach((o) => URL.revokeObjectURL(o.url)); outputs = []; $("outs").innerHTML = "";
+  const lay = layout(), params = colorParams(lay), fmt = S.preset === "custom" ? S.fmt : "image/jpeg", q = (S.preset === "custom" ? S.q : 92) / 100;
+  const ext = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" }[fmt];
+  for (let i = 0; i < S.photos.length; i++) {
+    go.textContent = `Exporting ${i + 1} of ${S.photos.length}…`; await tick();
+    const p = S.photos[i], crop = lay.crops[i], [w, h] = outSize(crop, lay), img = await loadImg(p.url), out = mk(w, h), x = ctx(out, true);
+    paint(x, p, img, 1, crop, w, h, true); img.src = "";
+    if (params[i]) { const id = x.getImageData(0, 0, w, h); applyColor(id, params[i], S.color / 100, p, crop, w, h); x.putImageData(id, 0, 0); }
+    const blob = await new Promise((r) => out.toBlob(r, fmt, fmt === "image/png" ? undefined : q)); out.width = 0;
+    outputs.push({ name: `${String(i + 1).padStart(2, "0")}_${p.name}.${ext}`, blob, url: URL.createObjectURL(blob), w, h });
   }
+  go.textContent = "Export again"; go.disabled = false; showOutputs();
 }
-$("exportBtn").onclick = async () => {
-  if (!S.lay) return;
-  const btn = $("exportBtn"); btn.disabled = true;
-  outputs.forEach((o) => URL.revokeObjectURL(o.url)); outputs = [];
-  const all = [S.ref, ...S.others], lay = layout(), params = colorParams(lay), strength = $("strength").value / 100;
-  const ext = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" }[S.fmt], q = $("quality").value / 100;
-  for (let i = 0; i < all.length; i++) {
-    btn.textContent = `Exporting ${i + 1} of ${all.length}…`;
-    await new Promise((r) => setTimeout(r, 30));
-    const [w, h] = outSize(lay.crops[i]);
-    const { out, x } = drawHQ(all[i], lay.crops[i], w, h);
-    if (params[i] && strength > 0) { const id = x.getImageData(0, 0, w, h); applyColor(id, params[i], strength); x.putImageData(id, 0, 0); }
-    const blob = await toBlob(out, S.fmt, S.fmt === "image/png" ? undefined : q);
-    out.width = 0;
-    const name = `${String(i + 1).padStart(2, "0")}_${all[i].name}.${ext}`;
-    outputs.push({ name, blob, url: URL.createObjectURL(blob), w, h });
-  }
-  btn.textContent = "Export"; btn.disabled = false;
-  showOutputs();
-};
+async function saveFile(name, blob, btn) {
+  const file = new File([blob], name, { type: blob.type });
+  if (navigator.canShare?.({ files: [file] })) { try { await navigator.share({ files: [file] }); if (btn) btn.textContent = "Saved"; return; } catch (e) { if (e?.name === "AbortError") return; } }
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name; a.click();
+}
 function showOutputs() {
   const box = $("outs"); box.innerHTML = "";
-  const head = document.createElement("div"); head.className = "out";
-  head.innerHTML = `<div class="row"><span>On iPhone: press and hold a photo, then “Save to Photos”.</span><button class="btn" id="zipBtn">Save all (.zip)</button></div>`;
-  box.appendChild(head);
+  const files = outputs.map((o) => new File([o.blob], o.name, { type: o.blob.type })), canAll = navigator.canShare?.({ files });
+  const all = document.createElement("button"); all.className = "glass pill wide"; all.textContent = canAll ? "Save all to Photos" : "Save all (.zip)";
+  all.onclick = async () => {
+    if (canAll) { try { await navigator.share({ files }); } catch {} return; }
+    if (!window.JSZip) { all.textContent = "Zip unavailable"; return; }
+    all.textContent = "Zipping…"; const z = new JSZip(); outputs.forEach((o) => z.file(o.name, o.blob));
+    await saveFile("even-frames.zip", await z.generateAsync({ type: "blob", compression: "STORE" })); all.textContent = "Save all (.zip)";
+  };
+  box.appendChild(all);
   outputs.forEach((o) => {
     const d = document.createElement("div"); d.className = "out";
     d.innerHTML = `<img alt=""><div class="row"><span></span><button class="btn">Save</button></div>`;
     d.querySelector("img").src = o.url; d.querySelector("img").alt = o.name;
     d.querySelector("span").textContent = `${o.name} · ${o.w}×${o.h}px · ${(o.blob.size / 1e6).toFixed(1)} MB`;
-    const b = d.querySelector("button"); b.onclick = () => saveFile(o.name, o.blob, b);
-    box.appendChild(d);
+    const b = d.querySelector("button"); b.onclick = () => saveFile(o.name, o.blob, b); box.appendChild(d);
   });
-  $("zipBtn").onclick = async () => {
-    const b = $("zipBtn");
-    if (!window.JSZip) { b.textContent = "Zip unavailable"; return; }
-    b.textContent = "Zipping…";
-    const z = new JSZip(); outputs.forEach((o) => z.file(o.name, o.blob));
-    const blob = await z.generateAsync({ type: "blob", compression: "STORE" });
-    b.textContent = "Save all (.zip)";
-    saveFile("even-frames.zip", blob, b);
-  };
-  head.scrollIntoView({ block: "start" });
+  all.scrollIntoView({ block: "start", behavior: "smooth" });
 }
+
+/* ---------- wiring */
+document.querySelectorAll("[data-ic]").forEach((el) => el.insertAdjacentHTML("afterbegin", ic(el.dataset.ic)));
+[["orig", "Original"], ["4:5", "4:5"], ["1:1", "1:1"], ["3:4", "3:4"], ["2:3", "2:3"], ["9:16", "9:16"], ["3:2", "3:2"], ["16:9", "16:9"]].forEach(([v, l]) => {
+  const b = document.createElement("button"); b.className = "chip"; b.dataset.v = v; b.textContent = l;
+  b.onclick = () => { S.aspect = v; schedule(); }; $("ratios").appendChild(b);
+});
+[["full", "Full"], ["2160", "2160"], ["1440", "1440"], ["1080", "1080"]].forEach(([v, l]) => {
+  const b = document.createElement("button"); b.className = "chip"; b.dataset.v = v; b.textContent = l;
+  b.onclick = () => { S.width = v; renderExp(); }; $("widths").appendChild(b);
+});
+const bindSeg = (id, fn) => $(id).querySelectorAll("button").forEach((b) => (b.onclick = () => fn(b.dataset.v)));
+bindSeg("edges", (v) => { S.edges = v; schedule(); });
+bindSeg("protect", (v) => { S.protect = v === "1"; schedule(); });
+bindSeg("fmt", (v) => { S.fmt = v; renderExp(); });
+bindSeg("kinds", async (v) => { S.kindLocked = true; await ensureKind(v); S.kind = v; S.busyText = ""; schedule(); });
+const slide = (id, fn) => { $(id).oninput = (e) => { fn(+e.target.value); S.fast = true; schedule(); }; $(id).onchange = () => { S.fast = false; schedule(); }; };
+slide("zoom", (v) => (S.zoom = v));
+slide("col", (v) => (S.color = v));
+$("q").oninput = (e) => { S.q = +e.target.value; $("qV").textContent = S.q; };
+document.querySelectorAll("#tabs .tab").forEach((t) => (t.onclick = () => { S.tab = t.dataset.t; schedule(); }));
+$("posReset").onclick = () => { S.pos = null; schedule(); };
+$("guidesBtn").onclick = () => { S.guides = !S.guides; schedule(); };
+$("ghostBtn").onclick = () => { S.ghost = !S.ghost; schedule(); };
+$("editBtn").onclick = () => openEditor(S.cur);
+$("refBtn").onclick = () => { S.ref = S.cur; S.pos = null; toast("Reference set. Every photo now matches this one."); schedule(); };
+$("rmBtn").onclick = () => {
+  const i = S.cur, p = S.photos[i]; URL.revokeObjectURL(p.url); p.el?.remove(); S.photos.splice(i, 1);
+  if (i === S.ref) S.ref = 0; else if (i < S.ref) S.ref--; schedule();
+};
+$("viewBtn").onclick = () => { S.view = S.view === "grid" ? "one" : "grid"; schedule(); };
+$("exportBtn").onclick = () => { renderExp(); $("outs").innerHTML = ""; $("exp").hidden = false; };
+$("expClose").onclick = () => { $("exp").hidden = true; };
+$("expGo").onclick = doExport;
+$("pick").onclick = () => $("file").click();
+$("file").onchange = (e) => { const f = [...e.target.files]; e.target.value = ""; addFiles(f); };
+(() => { const c = mk(2, 2); if (!c.toDataURL("image/webp").startsWith("data:image/webp")) $("webpBtn").hidden = true; })();
+(() => {
+  const b = $("cmpBtn"), on = (e) => { e.preventDefault(); S.comparing = true; schedule(); }, off = () => { if (S.comparing) { S.comparing = false; schedule(); } };
+  b.addEventListener("pointerdown", on); ["pointerup", "pointercancel", "pointerleave"].forEach((t) => b.addEventListener(t, off));
+})();
+(() => {
+  const f = $("frame"); let st = null;
+  f.addEventListener("pointerdown", (e) => { if (e.target.closest("button")) return; st = { x: e.clientX, y: e.clientY, tx: S.lay.tx, ty: S.lay.ty }; f.setPointerCapture(e.pointerId); });
+  f.addEventListener("pointermove", (e) => {
+    if (!st) return; const r = f.getBoundingClientRect();
+    S.pos = [clamp(st.tx + (e.clientX - st.x) / r.width, 0.05, 0.95), clamp(st.ty + (e.clientY - st.y) / r.height, 0.05, 0.95)];
+    S.fast = true; schedule();
+  });
+  const end = () => { if (st) { st = null; S.fast = false; schedule(); } };
+  f.addEventListener("pointerup", end); f.addEventListener("pointercancel", end);
+})();
+addEventListener("resize", schedule);
 render();
 </script>
+</html>
