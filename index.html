@@ -116,6 +116,7 @@ button.tag svg { width: 14px; height: 14px; }
 .th .n { position: absolute; left: 4px; top: 4px; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 9px; background: rgba(0,0,0,.6); font-size: 11px; font-weight: 700; display: grid; place-items: center; }
 .th .lbl { position: absolute; left: 0; right: 0; bottom: 0; font-size: 9px; font-weight: 800; letter-spacing: .06em; text-align: center; padding: 2px 0; }
 .th .lbl.ref { background: rgba(10,132,255,.92); }
+.th .dot { position: absolute; right: 6px; top: 6px; width: 9px; height: 9px; border-radius: 50%; background: var(--warn); box-shadow: 0 0 0 1.5px rgba(0,0,0,.45); }
 .th .miss { position: absolute; right: 4px; top: 4px; width: 18px; height: 18px; border-radius: 50%; background: var(--warn); color: #000; font-size: 12px; font-weight: 800; display: grid; place-items: center; }
 .th .x { position: absolute; right: 2px; top: 2px; width: 24px; height: 24px; border-radius: 50%; background: rgba(0,0,0,.7); display: grid; place-items: center; }
 .th .x svg { width: 12px; height: 12px; stroke-width: 3; }
@@ -233,7 +234,7 @@ button.tag svg { width: 14px; height: 14px; }
 <script type="module">
 const $ = (id) => document.getElementById(id);
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
-const DETECT = 768, MID = 1600, MAX_AREA = 16_000_000, IG = 1080;
+const DETECT = 768, MID = 1200, MAX_AREA = 16_000_000, IG = 1080;
 const RATIOS = [["orig", "Orig", 0], ["4:5", "4:5", 0.8], ["1:1", "1:1", 1], ["3:4", "3:4", 0.75], ["9:16", "9:16", 0.5625], ["3:2", "3:2", 1.5], ["16:9", "16:9", 1.7778]];
 const P3 = matchMedia("(color-gamut: p3)").matches;
 const store = { get: (k) => { try { return localStorage.getItem(k); } catch { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch {} } };
@@ -246,7 +247,14 @@ const ref = () => S.photos.find((p) => p.id === S.refId);
 const sel = () => S.photos.find((p) => p.id === S.selId);
 const idx = (p) => S.photos.indexOf(p);
 
-if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost")) navigator.serviceWorker.register("sw.js").catch(() => {});
+const swOK = "serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost");
+if (swOK) navigator.serviceWorker.register("sw.js").catch(() => {});
+// The first visit loads the models before the service worker takes over; hand it the list so it keeps them (from the browser cache, no second download).
+function keepOffline(extra = []) {
+  if (!swOK) return;
+  const files = ["index.html", "manifest.webmanifest", "apple-touch-icon.png", "icon-192.png", "mp/vision_bundle.mjs", "mp/vision_wasm_internal.js", "mp/vision_wasm_internal.wasm", "mp/face_detector.tflite", "mp/pose_landmarker_lite.task", ...extra];
+  navigator.serviceWorker.ready.then((reg) => reg.active?.postMessage({ keep: files.map((f) => new URL(f, location.href).href) })).catch(() => {});
+}
 
 /* ---------------- detection: faces, body poses, objects (only when no person) */
 const base = new URL("mp/", location.href).href;
@@ -260,6 +268,7 @@ const ready = (async () => {
       vision.PoseLandmarker.createFromOptions(fileset, { baseOptions: { modelAssetPath: base + "pose_landmarker_lite.task", delegate: "CPU" }, runningMode: "IMAGE", numPoses: 4 }).catch((e) => (console.warn(e), null)),
     ]);
     S.status = "";
+    keepOffline();
   } catch (e) { console.warn(e); S.status = "Auto-detect unavailable. Place subjects by hand."; }
   if (!S.photos.length) sub(S.status);
 })();
@@ -267,6 +276,7 @@ async function objectDetector() {
   if (objDet || !vision) return objDet;
   try { objDet = await vision.ObjectDetector.createFromOptions(fileset, { baseOptions: { modelAssetPath: base + "object_detector.tflite", delegate: "CPU" }, runningMode: "IMAGE", scoreThreshold: 0.35, maxResults: 5 }); }
   catch (e) { console.warn(e); }
+  if (objDet) keepOffline(["mp/object_detector.tflite"]);
   return objDet;
 }
 function sub(t) { $("sub").textContent = t; }
@@ -523,6 +533,7 @@ function stage() {
   a.lastElementChild.textContent = miss ? "Set subject" : cands(p).length > 1 && !p.manual ? "Choose subject" : "Adjust subject";
   const z = $("zoom"), zmax = Math.max(3, lay.fit * 1.5);
   z.min = lay.fit; z.max = zmax; z.value = lay.zoom;
+  z.setAttribute("aria-label", lay.fit > 1.001 ? `Subject size. Far left is the tightest fit photo ${lay.limiter + 1} allows` : "Subject size. Far left matches the reference framing");
   $("zoomOut").disabled = lay.zoom <= lay.fit * 1.001; $("zoomIn").disabled = lay.zoom >= zmax * 0.999;
   sub(note(p, lay));
   drawStrip();
@@ -585,7 +596,9 @@ function drawStrip() {
     const n = document.createElement("span"); n.className = "n"; n.textContent = i + 1; b.appendChild(n);
     if (p.id === S.refId) { const r = document.createElement("span"); r.className = "lbl ref"; r.textContent = "REF"; b.appendChild(r); }
     const isSel = p.id === S.selId && p.id !== S.refId && !S.editing;
+    const c = S.lay?.crops.get(p.id), check = c && p.id !== S.refId && (c.shift > 0.02 || (S.quality === "best" && c.w < IG));
     if (missing(p, md) && !isSel) { const m = document.createElement("span"); m.className = "miss"; m.textContent = "!"; b.appendChild(m); }
+    else if (check && !isSel) { const m = document.createElement("span"); m.className = "dot"; b.appendChild(m); b.setAttribute("aria-label", b.getAttribute("aria-label") + ", has a note"); }
     if (isSel) {
       const x = document.createElement("button"); x.className = "x"; x.setAttribute("aria-label", `Remove photo ${i + 1}`);
       x.innerHTML = `<svg class="i" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>`;
