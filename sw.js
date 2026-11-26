@@ -1,5 +1,5 @@
 // Offline support without a big first download: files are kept as the app uses them.
-// Page: network first (updates arrive at once). Models in mp/: cache first (they never change in place).
+// Page: network first, revalidated every time (updates arrive at once). Models in mp/: cache first (they never change in place).
 // Everything else: served from cache, refreshed in the background.
 const V = "even-frames-5";
 self.addEventListener("install", () => self.skipWaiting());
@@ -17,7 +17,8 @@ self.addEventListener("fetch", (e) => {
   const req = e.request, url = new URL(req.url);
   if (req.method !== "GET" || url.origin !== location.origin) return;
   if (req.mode === "navigate") {
-    e.respondWith(fetch(req).then((r) => put("index.html", r)).catch(() => caches.match("index.html")));
+    // no-cache = always ask the server whether the page changed (cheap), so a new version shows on the next open
+    e.respondWith(fetch(req.url, { cache: "no-cache" }).then((r) => put("index.html", r)).catch(() => caches.match("index.html")));
   } else if (url.pathname.includes("/mp/")) {
     e.respondWith(caches.match(req).then((hit) => hit || fetch(req).then((r) => put(req, r))));
   } else {
