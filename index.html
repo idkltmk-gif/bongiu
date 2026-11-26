@@ -6,10 +6,10 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="bôngiu">
+<meta name="apple-mobile-web-app-title" content="bôngiu🤍">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="manifest" href="manifest.webmanifest">
-<title>bôngiu</title>
+<title>bôngiu🤍</title>
 <style>
 /* One fixed screen: top bar / photo stage / frame + zoom controls / photo strip. Glass chrome over black, iOS system type. */
 :root {
@@ -51,8 +51,9 @@ svg.i { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-widt
 
 /* home: pick a tool first; each tool is its own flow with its own photos */
 .home { width: min(380px, calc(100% - 32px)); display: grid; gap: 12px; align-self: center; }
-.home h1 { margin: 0 4px 6px; font-size: 34px; font-weight: 700; letter-spacing: -.025em; }
-.home .fine { margin: 6px 4px 0; font-size: 13px; color: var(--fg3); }
+.home-icon { width: 64px; height: 64px; border-radius: 15px; margin: 0 4px 4px; box-shadow: 0 6px 24px rgba(0,0,0,.45), inset 0 0 0 .5px rgba(255,255,255,.2); }
+.home h1 { margin: 0 4px; font-size: 34px; font-weight: 700; letter-spacing: -.025em; }
+.home .tagline { margin: 0 4px 10px; font-size: 15px; color: var(--fg2); }
 .tool { width: 100%; min-height: 76px; border-radius: 22px; padding: 14px 14px 14px 16px; display: grid; grid-template-columns: 44px 1fr 16px; gap: 14px; align-items: center; text-align: left; }
 .tool .ic { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; background: var(--accent); }
 .tool .ic.red { background: var(--danger); }
@@ -80,6 +81,8 @@ button.tag svg { width: 14px; height: 14px; }
 .er-in { position: absolute; inset: 0; transform-origin: 0 0; }
 .eraser canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .er-fit { right: 10px; }
+.er-in.anim { transition: transform .24s cubic-bezier(.2,.8,.2,1); }
+@media (prefers-reduced-motion: reduce) { .er-in.anim { transition: none; } }
 /* Remove has one row of tools: give the photo the space */
 .app.rm .controls { height: 60px; grid-template-rows: 44px; padding-top: 8px; }
 .app.rm .edit-row { grid-row: auto; }
@@ -189,7 +192,9 @@ button.tag svg { width: 14px; height: 14px; }
 
   <main class="stage" id="stage">
     <div class="home" id="home">
-      <h1>bôngiu</h1>
+      <img class="home-icon" src="icon-192.png" alt="" width="64" height="64">
+      <h1>bôngiu🤍</h1>
+      <p class="tagline">Two quick photo fixes. Nothing leaves your phone.</p>
       <button class="tool glass" id="goAlign">
         <span class="ic"><svg class="i" viewBox="0 0 24 24"><rect x="2.5" y="4" width="8.5" height="16" rx="2"/><rect x="13" y="4" width="8.5" height="16" rx="2"/><circle cx="6.75" cy="10" r="2"/><circle cx="17.25" cy="10" r="2"/><path d="M3.5 17c.8-2 1.9-3 3.25-3s2.45 1 3.25 3M14 17c.8-2 1.9-3 3.25-3s2.45 1 3.25 3"/></svg></span>
         <span class="tx"><strong>Even out a set</strong><span>Same subject size in every photo</span></span>
@@ -200,7 +205,6 @@ button.tag svg { width: 14px; height: 14px; }
         <span class="tx"><strong>Remove people &amp; objects</strong><span>Tap what you don't want. It's filled in.</span></span>
         <svg class="i chev" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg>
       </button>
-      <p class="fine">Photos stay on this device.</p>
     </div>
 
     <div class="empty glass" id="empty" hidden>
@@ -598,7 +602,10 @@ function renderRemove() {
   $("ratios").hidden = $("zoomRow").hidden = $("editRow").hidden = $("stripHint").hidden = true; $("eraseRow").hidden = !n;
   drawStrip();
   if (!n) { $("eraser").hidden = true; sub(""); syncSave(); return; }
-  if (ER.pid !== p.id) { Object.assign(ER, { pid: p.id, start: 0, sel: null, any: false, hist: [], before: false }); Object.assign(Z, { s: 1, x: 0, y: 0 }); }
+  if (ER.pid !== p.id) {
+    if (ER.pid !== null) ZS.set(ER.pid, { ...Z });
+    setSel(null); Object.assign(ER, { pid: p.id, start: 0, hist: [], before: false }); Object.assign(Z, ZS.get(p.id) || { s: 1, x: 0, y: 0 });
+  }
   ER.ready = !!inpaint;
   drawEraser();
 }
@@ -840,7 +847,7 @@ function addGrain(out, p, ox, oy, k) { // at save time, at the final resolution,
   }
 }
 function rebuildMid(p) {
-  if (p.mid !== p.mid0) p.mid.c.width = 0;
+  if (p.mid !== p.mid0 && !p.mid.shared) p.mid.c.width = 0;
   if (!p.edits.length) { p.mid = p.mid0; } else {
     const c = document.createElement("canvas"); c.width = p.mid0.c.width; c.height = p.mid0.c.height;
     const x = c.getContext("2d"); x.imageSmoothingQuality = "high"; x.drawImage(p.mid0.c, 0, 0); drawEdits(x, p, 0, 0, p.mid0.s);
@@ -856,7 +863,8 @@ function erNote() {
     ER.any ? "Tap Remove. Tap red to take it away." : sel()?.edits.length ? "Hold the photo to see before" : "Tap what to remove, or paint over it");
 }
 // zoom of the Remove view: scale and offset in screen points (two fingers pinch and pan; a trackpad pinches and scrolls)
-const Z = { s: 1, x: 0, y: 0 }, ZMAX = 6;
+const Z = { s: 1, x: 0, y: 0 }, ZMAX = 6, ZS = new Map(); // ZS: zoom kept for each photo
+function animZoom() { const e = $("erIn"); e.classList.add("anim"); clearTimeout(animZoom.t); animZoom.t = setTimeout(() => e.classList.remove("anim"), 260); }
 function setZoom(s, x, y) {
   const el = $("eraser"), w = el.clientWidth, h = el.clientHeight;
   Z.s = clamp(s, 1, ZMAX); Z.x = clamp(x, w - w * Z.s, 0); Z.y = clamp(y, h - h * Z.s, 0);
@@ -888,7 +896,25 @@ function drawEraser() {
   erNote(); syncSave();
 }
 function blank(p) { const c = document.createElement("canvas"); c.width = p.mid.c.width; c.height = p.mid.c.height; return c; }
-function snapshot(p) { const c = blank(p); if (ER.sel) c.getContext("2d").drawImage(ER.sel, 0, 0); ER.hist.push(ER.sel); if (ER.hist.length > 12) ER.hist.shift(); ER.sel = c; return c.getContext("2d"); }
+function pack(c) {
+  if (!c) return null;
+  const d = c.getContext("2d").getImageData(0, 0, c.width, c.height).data, a = new Uint8Array(c.width * c.height);
+  for (let i = 0; i < a.length; i++) a[i] = d[i * 4 + 3];
+  return { w: c.width, h: c.height, a };
+}
+function unpack(s) {
+  if (!s) return null;
+  const c = document.createElement("canvas"); c.width = s.w; c.height = s.h;
+  const x = c.getContext("2d"), im = x.createImageData(s.w, s.h);
+  for (let i = 0; i < s.a.length; i++) if (s.a[i]) { im.data[i * 4] = 255; im.data[i * 4 + 1] = 59; im.data[i * 4 + 2] = 48; im.data[i * 4 + 3] = s.a[i]; }
+  x.putImageData(im, 0, 0); return c;
+}
+function setSel(c) { if (ER.sel && ER.sel !== c) ER.sel.width = 0; ER.sel = c; ER.any = !!(c && alphaBox(c, 4)); }
+function snapshot(p) {
+  const c = blank(p); if (ER.sel) c.getContext("2d").drawImage(ER.sel, 0, 0);
+  ER.hist.push(pack(ER.sel)); if (ER.hist.length > 20) ER.hist.shift();
+  if (ER.sel) ER.sel.width = 0; ER.sel = c; return c.getContext("2d");
+}
 function alphaBox(c, step = 1) { // bounding box and pixel count of the opaque part of a canvas
   const { width: W, height: H } = c, d = c.getContext("2d").getImageData(0, 0, W, H).data;
   let x0 = W, y0 = H, x1 = -1, y1 = -1, n = 0;
@@ -992,6 +1018,52 @@ function measureGrain(img, R, p) { // photo noise next to the area, at full reso
   c.width = 0; vals.sort((m, n) => m - n);
   return vals.length ? Math.min(10, vals[vals.length >> 1]) : 0;
 }
+// The model fills at about 512 px; bigger areas come back blocky and a shade off. Inside the hole only:
+// 1) smooth at the model's own scale, 2) shift the colour so the hole's rim matches the photo just outside it.
+function cleanFill(out, px, mm, w, h) {
+  const n = w * h, f = new Uint8ClampedArray(n * 4), hole = (i) => mm[i * 4 + 3] > 127;
+  for (let i = 0; i < n; i++) { f[i * 4] = out[i]; f[i * 4 + 1] = out[n + i]; f[i * 4 + 2] = out[2 * n + i]; f[i * 4 + 3] = 255; }
+  const long = Math.max(w, h);
+  if (long > 560) {
+    const a = document.createElement("canvas"); a.width = w; a.height = h; const ax = a.getContext("2d"); ax.putImageData(new ImageData(f, w, h), 0, 0);
+    const k = 512 / long, b = document.createElement("canvas"); b.width = Math.max(1, Math.round(w * k)); b.height = Math.max(1, Math.round(h * k));
+    const bx = b.getContext("2d"); bx.imageSmoothingQuality = "high"; bx.drawImage(a, 0, 0, b.width, b.height);
+    ax.imageSmoothingQuality = "high"; ax.clearRect(0, 0, w, h); ax.drawImage(b, 0, 0, w, h);
+    const sm = ax.getImageData(0, 0, w, h).data;
+    for (let i = 0; i < n; i++) if (hole(i)) { f[i * 4] = sm[i * 4]; f[i * 4 + 1] = sm[i * 4 + 1]; f[i * 4 + 2] = sm[i * 4 + 2]; }
+    a.width = b.width = 0;
+  }
+  // colour: measure how far the fill is off at the rim (hole pixel vs the photo 2 px outside it), then spread
+  // that difference smoothly inward (a membrane), so sky stays sky-coloured and sand stays sand-coloured
+  const G = Math.max(1, Math.ceil(long / 96)), gw = Math.ceil(w / G), gh = Math.ceil(h / G), m = gw * gh;
+  const val = new Float32Array(m * 3), cnt = new Float32Array(m), inH = new Uint8Array(m);
+  for (let y = 2; y < h - 2; y++) for (let x = 2; x < w - 2; x++) {
+    const i = y * w + x; if (!hole(i)) continue;
+    const g = ((y / G) | 0) * gw + ((x / G) | 0); inH[g] = 1;
+    for (const j of [i - 2, i + 2, i - 2 * w, i + 2 * w]) if (!hole(j)) { for (let ch = 0; ch < 3; ch++) val[g * 3 + ch] += px[j * 4 + ch] - f[i * 4 + ch]; cnt[g]++; break; }
+  }
+  const fixed = new Uint8Array(m);
+  for (let g = 0; g < m; g++) if (cnt[g]) { fixed[g] = 1; for (let ch = 0; ch < 3; ch++) val[g * 3 + ch] = clamp(val[g * 3 + ch] / cnt[g], -40, 40); }
+  const nb = (g) => { const gx = g % gw, out = []; if (gx > 0) out.push(g - 1); if (gx < gw - 1) out.push(g + 1); if (g >= gw) out.push(g - gw); if (g < m - gw) out.push(g + gw); return out; };
+  for (let it = 0; it < 300; it++) for (let g = 0; g < m; g++) {
+    if (!inH[g] || fixed[g]) continue;
+    let a0 = 0, a1 = 0, a2 = 0, k = 0;
+    for (const q of nb(g)) if (inH[q]) { a0 += val[q * 3]; a1 += val[q * 3 + 1]; a2 += val[q * 3 + 2]; k++; }
+    if (k) { val[g * 3] = a0 / k; val[g * 3 + 1] = a1 / k; val[g * 3 + 2] = a2 / k; }
+  }
+  for (let pass = 0; pass < 2; pass++) for (let g = 0; g < m; g++) { // cells outside the hole borrow a neighbour's value, so the smooth upscale does not pull edges to 0
+    if (inH[g]) continue;
+    for (const q of nb(g)) if (inH[q]) { val[g * 3] = val[q * 3]; val[g * 3 + 1] = val[q * 3 + 1]; val[g * 3 + 2] = val[q * 3 + 2]; inH[g] = 2; break; }
+  }
+  const gc = document.createElement("canvas"); gc.width = gw; gc.height = gh; const gx = gc.getContext("2d"), gi = gx.createImageData(gw, gh);
+  for (let g = 0; g < m; g++) { for (let ch = 0; ch < 3; ch++) gi.data[g * 4 + ch] = 128 + val[g * 3 + ch] * 3; gi.data[g * 4 + 3] = 255; }
+  gx.putImageData(gi, 0, 0);
+  const uc = document.createElement("canvas"); uc.width = w; uc.height = h; const ux = uc.getContext("2d"); ux.imageSmoothingQuality = "high"; ux.drawImage(gc, 0, 0, w, h);
+  const off = ux.getImageData(0, 0, w, h).data;
+  for (let i = 0; i < n; i++) if (hole(i)) for (let ch = 0; ch < 3; ch++) f[i * 4 + ch] += (off[i * 4 + ch] - 128) / 3;
+  gc.width = uc.width = 0;
+  return f;
+}
 async function fillArea(p, img, b) { // b: area in preview (mid) pixels
   const s = p.mid.s, m = Math.max(b.w, b.h) * 0.6 + 24; // context around the area helps the fill
   const R = { x: Math.floor(Math.max(0, (b.x - m) / s)), y: Math.floor(Math.max(0, (b.y - m) / s)) };
@@ -1013,9 +1085,9 @@ async function fillArea(p, img, b) { // b: area in preview (mid) pixels
   sm.width = Math.max(1, Math.round(sw / f)); sm.height = Math.max(1, Math.round(sh / f));
   const smx = sm.getContext("2d"); smx.imageSmoothingQuality = "high"; smx.drawImage(mc, 0, 0, sm.width, sm.height);
   mx.clearRect(0, 0, sw, sh); mx.imageSmoothingQuality = "high"; mx.drawImage(sm, 0, 0, sw, sh);
-  const soft = mx.getImageData(0, 0, sw, sh).data, patch = sx.createImageData(sw, sh);
+  const soft = mx.getImageData(0, 0, sw, sh).data, patch = sx.createImageData(sw, sh), fill = cleanFill(out, px, mm, sw, sh);
   for (let i = 0; i < n; i++) {
-    patch.data[i * 4] = out[i]; patch.data[i * 4 + 1] = out[n + i]; patch.data[i * 4 + 2] = out[2 * n + i];
+    patch.data[i * 4] = fill[i * 4]; patch.data[i * 4 + 1] = fill[i * 4 + 1]; patch.data[i * 4 + 2] = fill[i * 4 + 2];
     patch.data[i * 4 + 3] = Math.max(soft[i * 4 + 3], mm[i * 4 + 3] > 127 ? 255 : 0);
   }
   const pc = document.createElement("canvas"); pc.width = sw; pc.height = sh; pc.getContext("2d").putImageData(patch, 0, 0);
@@ -1031,13 +1103,13 @@ async function removeSelected() {
   try {
     loaded = await loadImg(p.file); // the original is decoded only for this step, then released
     for (let i = 0; i < list.length; i++) { if (list.length > 1) { ER.busy = `Removing ${i + 1} of ${list.length}…`; erNote(); } await fillArea(p, loaded.img, list[i]); }
-    ER.sel = null; ER.hist = []; ER.any = false;
+    setSel(null); ER.hist = [];
   } catch (e) { console.warn(e); p.edits.length = before; toast("Couldn't remove that. Try a smaller area.", 3200); }
   finally { if (loaded) release(loaded); }
   rebuildMid(p); ER.busy = ""; drawEraser(); drawStrip();
 }
 (() => { // one finger: tap = select (tap red = take it away), drag = paint, hold still = before. Two fingers: pinch and pan.
-  const el = $("eraser"), pts = new Map(); let on = false, painting = false, pinch = null, sx = 0, sy = 0, t = 0, last = null, ctx = null;
+  const el = $("eraser"), pts = new Map(); let on = false, painting = false, pinch = null, sx = 0, sy = 0, t = 0, last = null, ctx = null, lastTap = null, pend = 0;
   const local = (e) => { const r = el.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
   const photoRect = () => $("erIn").getBoundingClientRect();
   const toMid = (e) => { const r = photoRect(), p = sel(); return [((e.clientX - r.left) / r.width) * p.mid.c.width, ((e.clientY - r.top) / r.height) * p.mid.c.height]; };
@@ -1048,7 +1120,7 @@ async function removeSelected() {
   };
   const startPinch = () => {
     clearTimeout(t);
-    if (painting) { ER.sel = ER.hist.pop() ?? null; ER.any = !!(ER.sel && alphaBox(ER.sel, 4)); } // the stroke the first finger began was the start of a pinch
+    if (painting) setSel(unpack(ER.hist.pop())); // the stroke the first finger began was the start of a pinch
     ER.before = false; on = painting = false;
     const [a, b] = [...pts.values()];
     pinch = { d: Math.hypot(a[0] - b[0], a[1] - b[1]) || 1, m: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2], s: Z.s, x: Z.x, y: Z.y };
@@ -1082,8 +1154,15 @@ async function removeSelected() {
     if (ER.before) { ER.before = false; drawEraser(); return; }
     if (painting) { ER.any = true; drawEraser(); return; }
     if (cancel) return;
-    const r = photoRect();
-    tapAt(clamp((e.clientX - r.left) / r.width, 0, 1), clamp((e.clientY - r.top) / r.height, 0, 1));
+    const now = performance.now(), [lx, ly] = local(e);
+    if (lastTap && now - lastTap.t < 300 && Math.hypot(lx - lastTap.x, ly - lastTap.y) < 30) { // double tap: zoom in there, or back to fit
+      clearTimeout(pend); lastTap = null; animZoom();
+      if (Z.s > 1.05) setZoom(1, 0, 0); else { const s = 2.5; setZoom(s, lx - (lx - Z.x) * (s / Z.s), ly - (ly - Z.y) * (s / Z.s)); }
+      return;
+    }
+    lastTap = { t: now, x: lx, y: ly };
+    const r = photoRect(), nx = clamp((e.clientX - r.left) / r.width, 0, 1), ny = clamp((e.clientY - r.top) / r.height, 0, 1);
+    clearTimeout(pend); pend = setTimeout(() => tapAt(nx, ny), 260);
   };
   el.addEventListener("pointerup", (e) => up(e, false));
   el.addEventListener("pointercancel", (e) => up(e, true));
@@ -1095,10 +1174,10 @@ async function removeSelected() {
     else setZoom(Z.s, Z.x - e.deltaX, Z.y - e.deltaY);
   }, { passive: false });
 })();
-$("erFit").onclick = () => setZoom(1, 0, 0);
+$("erFit").onclick = () => { animZoom(); setZoom(1, 0, 0); };
 $("erUndo").onclick = () => {
   const p = sel();
-  if (ER.hist.length) { ER.sel = ER.hist.pop(); ER.any = !!(ER.sel && alphaBox(ER.sel, 4)); }
+  if (ER.hist.length) setSel(unpack(ER.hist.pop()));
   else if (p.edits.length > ER.start) { p.edits.pop(); rebuildMid(p); drawStrip(); }
   drawEraser();
 };
@@ -1114,17 +1193,26 @@ async function toAlign() {
   const hadRef = !!S.refId; render();
   for (let i = 0; i < src.length; i++) {
     toast(`Finding the subject ${i + 1} of ${src.length}…`, 15000);
-    const p = src[i], c = document.createElement("canvas"); c.width = p.mid.c.width; c.height = p.mid.c.height; c.getContext("2d").drawImage(p.mid.c, 0, 0);
-    const mid = p.edits.length ? { c, s: p.mid.s } : p.mid0, sm = scaled(mid.c, mid.c.width, mid.c.height, DETECT);
-    if (!p.edits.length) c.width = 0;
+    const p = src[i], mid = p.mid; mid.shared = true; // both tools use the same preview: no second copy in memory
+    const sm = scaled(mid.c, mid.c.width, mid.c.height, DETECT);
     const est = await detect(sm.c, 1 / (mid.s * sm.s)); sm.c.width = 0;
     const q = { ...p, id: S.nextId++, mid, edits: p.edits.slice(), est, pick: null, manual: null };
     S.photos.push(q); if (!S.refId) S.refId = q.id;
   }
   S.selId = S.photos[S.photos.length - 1].id; render();
+  if (previewMB() > BIG_MB) return warnIfBig();
   toast(hadRef ? `${src.length} photo${src.length > 1 ? "s" : ""} added to your set` : S.photos.length > 1 ? "Photo 1 is the reference. Change it in ⋯." : "Now add the photos to fix", 4000);
 }
 $("optAlign").onclick = () => { $("menu").hidden = true; toAlign(); };
+
+// rough memory of all previews kept by both tools (each canvas counted once)
+function previewMB() {
+  const seen = new Set(); let b = 0;
+  for (const ps of [S.photos, ...Object.values(sets).map((x) => x?.photos || [])]) for (const p of ps) for (const m of [p.mid0, p.mid]) if (m?.c.width && !seen.has(m.c)) { seen.add(m.c); b += m.c.width * m.c.height * 4; }
+  return b / 1e6;
+}
+const BIG_MB = 260;
+function warnIfBig() { if (previewMB() > BIG_MB) toast("That's a lot of photos for Safari. Save what you have, then start a new set.", 6000); }
 
 /* ---------------- adding photos */
 $("emptyCta").onclick = () => { if (S.app === "remove") { loadEraser().catch(() => {}); return $("rmFile").click(); } (ref() ? $("moreFile") : $("refFile")).click(); };
@@ -1140,7 +1228,7 @@ $("rmFile").onchange = async (e) => {
   }
   $("toast").hidden = true;
   if (first) S.selId = first.id;
-  render(); warmEraser();
+  render(); warmEraser(); warnIfBig();
 };
 $("refFile").onchange = async (e) => {
   const f = e.target.files[0]; e.target.value = ""; if (!f) return;
@@ -1189,7 +1277,7 @@ $("optNew").onclick = () => {
   const b = $("optNew");
   if (Date.now() - armed > 3000) { armed = Date.now(); b.firstElementChild.textContent = "Tap again to remove all photos"; return; }
   if (ER.busy) return;
-  Object.assign(S, fresh(), { editing: false }); Object.assign(ER, { pid: null, sel: null, hist: [], any: false });
+  Object.assign(S, fresh(), { editing: false }); setSel(null); Object.assign(ER, { pid: null, hist: [] }); ZS.clear();
   $("menu").hidden = true; render();
 };
 addEventListener("resize", () => { if (S.app === "remove" && sel()) drawEraser(); else if (S.editing) drawEditor(); else if (S.lay && !$("view").hidden) stage(); });
