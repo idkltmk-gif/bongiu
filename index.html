@@ -38,7 +38,7 @@ svg.i { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-widt
   padding: var(--st) var(--sr) 0 var(--sl);
   background: radial-gradient(120% 70% at 10% 0%, #16223a 0%, transparent 55%), radial-gradient(90% 60% at 100% 100%, #2a1830 0%, transparent 60%), #000; }
 
-.top { display: grid; grid-template-columns: 88px 1fr 88px; align-items: center; padding: 8px 12px; gap: 8px; min-height: 60px; }
+.top { display: grid; grid-template-columns: 92px 1fr 92px; align-items: center; padding: 8px 12px; gap: 8px; min-height: 60px; }
 .top .title { text-align: center; min-width: 0; }
 .top .title strong { display: block; font-size: 16px; font-weight: 600; letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .top .title span { display: block; font-size: 12px; color: var(--fg3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -47,6 +47,18 @@ svg.i { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-widt
 .pill.pri { background: var(--accent); box-shadow: none; }
 .pill:disabled { opacity: .35; }
 .top .left { justify-self: start; }
+.lgroup { display: flex; gap: 4px; }
+
+/* home: pick a tool first; each tool is its own flow with its own photos */
+.home { width: min(380px, calc(100% - 32px)); display: grid; gap: 12px; align-self: center; }
+.home h1 { margin: 0 4px 6px; font-size: 34px; font-weight: 700; letter-spacing: -.025em; }
+.home .fine { margin: 6px 4px 0; font-size: 13px; color: var(--fg3); }
+.tool { width: 100%; min-height: 76px; border-radius: 22px; padding: 14px 14px 14px 16px; display: grid; grid-template-columns: 44px 1fr 16px; gap: 14px; align-items: center; text-align: left; }
+.tool .ic { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; background: var(--accent); }
+.tool .ic.red { background: var(--danger); }
+.tool strong { display: block; font-size: 17px; font-weight: 600; letter-spacing: -.01em; }
+.tool .tx span { display: block; font-size: 14px; color: var(--fg2); margin-top: 2px; }
+.tool .chev { width: 16px; height: 16px; color: var(--fg3); }
 
 .stage { position: relative; min-height: 0; display: grid; place-items: center; overflow: hidden; }
 .view { position: relative; border-radius: 14px; overflow: hidden; background: #111; touch-action: pan-y; }
@@ -64,7 +76,6 @@ button.tag svg { width: 14px; height: 14px; }
 .chip { position: absolute; bottom: 10px; height: 34px; padding: 0 13px; border-radius: 999px; font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; }
 .chip svg { width: 16px; height: 16px; }
 .adjust { left: 10px; }
-.rm { right: 10px; }
 .eraser { position: relative; touch-action: none; border-radius: 10px; overflow: hidden; }
 .eraser canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 #erMask { opacity: .55; }
@@ -158,26 +169,44 @@ button.tag svg { width: 14px; height: 14px; }
 
 <div class="app" id="app">
   <header class="top">
-    <button class="circ glass left" id="moreBtn" aria-label="More options">
-      <svg class="i" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.3" fill="currentColor"/><circle cx="12" cy="12" r="1.3" fill="currentColor"/><circle cx="19" cy="12" r="1.3" fill="currentColor"/></svg>
-    </button>
+    <div class="lgroup left" id="lgroup">
+      <button class="circ glass" id="backBtn" aria-label="Back to tools"><svg class="i" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
+      <button class="circ glass" id="moreBtn" aria-label="More options">
+        <svg class="i" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.3" fill="currentColor"/><circle cx="12" cy="12" r="1.3" fill="currentColor"/><circle cx="19" cy="12" r="1.3" fill="currentColor"/></svg>
+      </button>
+    </div>
     <button class="pill glass left" id="cancelBtn" hidden>Cancel</button>
-    <div class="title"><strong id="title">Even Frames</strong><span id="sub">Loading detection…</span></div>
+    <div class="title"><strong id="title"></strong><span id="sub"></span></div>
     <button class="pill pri" id="saveBtn" disabled>Save</button>
     <button class="pill pri" id="doneBtn" hidden>Done</button>
   </header>
 
   <main class="stage" id="stage">
-    <div class="empty glass" id="empty">
+    <div class="home" id="home">
+      <h1>Even Frames</h1>
+      <button class="tool glass" id="goAlign">
+        <span class="ic"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="5" width="7.5" height="14" rx="2"/><rect x="13.5" y="5" width="7.5" height="14" rx="2"/><path d="M2 10h20" stroke-dasharray="2 2.5"/></svg></span>
+        <span class="tx"><strong>Even out a set</strong><span>Same subject size in every photo</span></span>
+        <svg class="i chev" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg>
+      </button>
+      <button class="tool glass" id="goRemove">
+        <span class="ic red"><svg class="i" viewBox="0 0 24 24"><path d="M7 21h10M5.5 14.5l7-7 5 5-7 7H8l-2.5-2.5a1.4 1.4 0 0 1 0-2zM9.5 10.5l5 5"/></svg></span>
+        <span class="tx"><strong>Remove people &amp; objects</strong><span>Tap what you don't want. It's filled in.</span></span>
+        <svg class="i chev" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg>
+      </button>
+      <p class="fine">Photos stay on this device.</p>
+    </div>
+
+    <div class="empty glass" id="empty" hidden>
       <h1 id="emptyH">Make a photo set look even</h1>
       <p id="emptyP">Every photo copies the subject size and position of your favourite one.</p>
-      <div class="steps">
+      <div class="steps" id="steps">
         <div id="st1"><b>1</b><span>Pick the reference: the photo you like most</span></div>
         <div id="st2"><b>2</b><span>Add the photos to fix</span></div>
         <div id="st3"><b>3</b><span>Choose a frame, then Save</span></div>
       </div>
       <button class="cta" id="emptyCta">Choose reference photo</button>
-      <p class="fine">Photos stay on this device.</p>
+      <p class="fine" id="emptyFine">Photos stay on this device.</p>
     </div>
 
     <div class="view" id="view" hidden>
@@ -188,7 +217,6 @@ button.tag svg { width: 14px; height: 14px; }
       <button class="tag glass l" id="tagL" aria-label="Switch what this photo is compared with"><span>Reference</span><svg class="i" viewBox="0 0 24 24"><path d="M7 4l-3 3 3 3M4 7h13M17 20l3-3-3-3M20 17H7"/></svg></button>
       <span class="tag glass r" id="tagR">Fixed</span>
       <div class="handle" id="handle"><div class="knob"><svg viewBox="0 0 24 24"><path d="M9 6l-6 6 6 6M15 6l6 6-6 6"/></svg></div></div>
-      <button class="chip rm glass" id="removeBtn"><svg class="i" viewBox="0 0 24 24"><path d="M7 21h10M5.5 14.5l7-7 5 5-7 7H8l-2.5-2.5a1.4 1.4 0 0 1 0-2zM9.5 10.5l5 5"/></svg><span>Remove</span></button>
       <button class="chip adjust glass" id="adjustBtn"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="9" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg><span>Adjust subject</span></button>
     </div>
 
@@ -230,6 +258,7 @@ button.tag svg { width: 14px; height: 14px; }
 
   <input type="file" id="refFile" accept="image/*" hidden>
   <input type="file" id="moreFile" accept="image/*" multiple hidden>
+  <input type="file" id="rmFile" accept="image/*" multiple hidden>
 </div>
 
 <div class="scrim" id="menu" hidden>
@@ -265,8 +294,17 @@ const store = { get: (k) => { try { return localStorage.getItem(k); } catch { re
 
 // zoom: null = the reference's own framing (or the tightest zoom every photo allows)
 // save: progress of a batched save { sig, next, files } — dropped as soon as anything that changes the output changes
-const S = { photos: [], refId: null, selId: null, ratio: "4:5", zoom: null, cmp: "ref", quality: "best", fmt: "image/jpeg", guides: true, editing: false, lay: null, nextId: 1, save: null, status: "Loading detection…" };
+// app: null = home, "align" = Even out a set, "remove" = Remove people & objects. Each tool keeps its own photos (sets).
+const S = { app: null, photos: [], refId: null, selId: null, ratio: "4:5", zoom: null, cmp: "ref", quality: "best", fmt: "image/jpeg", guides: true, editing: false, lay: null, nextId: 1, save: null, status: "Loading detection…" };
 const BATCH_BYTES = 120e6;
+const SET = ["photos", "refId", "selId", "zoom", "save", "lay"], sets = {};
+const fresh = () => ({ photos: [], refId: null, selId: null, zoom: null, save: null, lay: null });
+function enter(app) { S.app = app; Object.assign(S, sets[app] || fresh()); render(); if (app === "remove" && S.photos.length) warmEraser(); }
+function goHome() {
+  if (ER.busy) return;
+  sets[S.app] = Object.fromEntries(SET.map((k) => [k, S[k]]));
+  Object.assign(S, fresh(), { app: null, editing: false }); render();
+}
 const ref = () => S.photos.find((p) => p.id === S.refId);
 const sel = () => S.photos.find((p) => p.id === S.selId);
 const idx = (p) => S.photos.indexOf(p);
@@ -294,7 +332,7 @@ const ready = (async () => {
     S.status = "";
     keepOffline();
   } catch (e) { console.warn(e); S.status = "Auto-detect unavailable. Place subjects by hand."; }
-  if (!S.photos.length) sub(S.status);
+  if (!S.photos.length) render();
 })();
 async function objectDetector() {
   if (objDet || !vision) return objDet;
@@ -328,7 +366,7 @@ function scaled(src, W, H, long) {
   return { c, s };
 }
 const big = (arr) => { if (!arr.length) return arr; const m = arr[0].h; return arr.filter((d) => d.h >= m * 0.3); };
-async function makePhoto(file) {
+async function makePhoto(file, find = true) {
   const loaded = await loadImg(file), { img } = loaded;
   const W = img.naturalWidth, H = img.naturalHeight, small = scaled(img, W, H, DETECT), mid = scaled(img, W, H, MID);
   release(loaded); // keep only small copies in memory; the full photo is decoded again at save time
@@ -336,7 +374,7 @@ async function makePhoto(file) {
   // mid0 = clean preview; mid = preview with removals applied; edits = removals in original pixel coordinates
   const p = { id: S.nextId++, file, name: file.name.replace(/\.[^.]+$/, "") || "photo", W, H, mid, mid0: mid, edits: [], thumb: "", date: await readDate(file), est: null, pick: null, manual: null };
   p.thumb = thumbOf(p);
-  p.est = await detect(small.c, 1 / small.s);
+  p.est = find ? await detect(small.c, 1 / small.s) : { faces: [], poses: [], objects: [] };
   small.c.width = 0;
   return p;
 }
@@ -507,13 +545,20 @@ function note(p, lay) { // one line, the most useful thing to know about this ph
   return "";
 }
 function render() {
-  const n = S.photos.length, R = ref(), ok = !!R && n > 1, p = sel();
-  $("moreBtn").hidden = S.editing; $("cancelBtn").hidden = !S.editing;
-  $("saveBtn").hidden = S.editing; $("doneBtn").hidden = !S.editing;
+  const n = S.photos.length, R = ref(), ok = !!R && n > 1, p = sel(), app = S.app;
+  $("home").hidden = !!app;
+  $("lgroup").hidden = !app || !!S.editing; $("cancelBtn").hidden = !S.editing;
+  $("saveBtn").hidden = !app || !!S.editing; $("doneBtn").hidden = !S.editing;
+  if (!app) {
+    $("title").textContent = ""; sub("");
+    for (const id of ["empty", "view", "eraser", "editor", "controls", "stripWrap"]) $(id).hidden = true;
+    return;
+  }
+  if (app === "remove") return renderRemove();
   $("saveBtn").disabled = !ok;
-  $("title").textContent = S.editing ? (S.editing === "erase" ? "Remove" : "Adjust subject") : ok && p ? (p.id === S.refId ? "Reference" : `Photo ${idx(p) + 1} of ${n}`) : "Even Frames";
+  $("title").textContent = S.editing ? "Adjust subject" : ok && p ? (p.id === S.refId ? "Reference" : `Photo ${idx(p) + 1} of ${n}`) : "Even out a set";
   if (!ok) sub(S.status);
-  $("empty").hidden = ok || S.editing;
+  $("empty").hidden = ok || S.editing; $("steps").hidden = false; $("emptyFine").textContent = "Photos stay on this device.";
   $("st1").className = R ? "done" : ""; $("st2").className = n > 1 ? "done" : "";
   $("emptyH").textContent = R ? "Now add the photos to fix" : "Make a photo set look even";
   $("emptyP").textContent = R ? "Add one or more photos from the same set. They will match your reference." : "Every photo copies the subject size and position of your favourite one.";
@@ -521,20 +566,41 @@ function render() {
   $("controls").hidden = !ok && !S.editing;
   $("stripWrap").hidden = !R;
   $("stripHint").hidden = n < 3 || S.editing || store.get("ef-reordered") === "1";
-  $("ratios").hidden = $("zoomRow").hidden = !!S.editing; $("editRow").hidden = S.editing !== "subject"; $("eraseRow").hidden = S.editing !== "erase";
-  if (S.editing) { drawStrip(); return S.editing === "erase" ? drawEraser() : drawEditor(); }
+  $("ratios").hidden = $("zoomRow").hidden = !!S.editing; $("editRow").hidden = !S.editing; $("eraseRow").hidden = true;
+  if (S.editing) { drawStrip(); return drawEditor(); }
   $("editor").hidden = $("eraser").hidden = true;
   $("view").hidden = !ok;
   if (!ok) { S.lay = null; drawStrip(); syncSave(); return; }
   drawRatios();
   stage();
 }
+// Remove: the photo under the brush fills the screen; the strip switches photos; removals stay until undone
+function renderRemove() {
+  const n = S.photos.length, p = sel();
+  $("title").textContent = n > 1 ? `Photo ${idx(p) + 1} of ${n}` : "Remove";
+  $("empty").hidden = !!n; $("steps").hidden = true;
+  $("emptyH").textContent = "Remove people and objects";
+  $("emptyP").textContent = "Tap what you don't want, or paint over it. The gap is filled from what's around it.";
+  $("emptyCta").textContent = "Choose photos";
+  $("emptyFine").textContent = "Photos stay on this device. The first use downloads about 45 MB.";
+  $("view").hidden = $("editor").hidden = true;
+  $("controls").hidden = $("stripWrap").hidden = !n;
+  $("ratios").hidden = $("zoomRow").hidden = $("editRow").hidden = $("stripHint").hidden = true; $("eraseRow").hidden = !n;
+  drawStrip();
+  if (!n) { $("eraser").hidden = true; sub(""); syncSave(); return; }
+  if (ER.pid !== p.id) Object.assign(ER, { pid: p.id, start: 0, sel: null, any: false, hist: [], before: false });
+  ER.ready = !!inpaint;
+  drawEraser();
+}
+const targets = () => (S.app === "remove" ? S.photos.filter((p) => p.edits.length) : S.photos);
+const cropOf = (p, lay) => (S.app === "remove" ? { x: 0, y: 0, w: p.W, h: p.H } : lay.crops.get(p.id));
 // anything that changes the saved files restarts a batched save
 const span = (a, b) => (a === b ? `${a}` : `${a}–${b}`);
 const signature = () => JSON.stringify([S.ratio, S.lay?.zoom.toFixed(4), S.quality, S.fmt, S.refId, S.photos.map((p) => [p.id, p.pick, p.edits.length, p.manual && [p.manual.cx, p.manual.cy, p.manual.h]])]);
 function syncSave() {
   if (S.save && S.save.sig !== signature()) S.save = null;
-  const b = $("saveBtn"), n = S.photos.length;
+  const b = $("saveBtn"), n = targets().length;
+  if (S.app === "remove" && !S.save?.files) b.disabled = !n;
   b.textContent = !S.save ? "Save" : S.save.files ? "Tap to save" : `Save ${span(S.save.next + 1, n)}`;
 }
 function stage() {
@@ -618,7 +684,7 @@ $("zoomIn").onclick = () => { S.zoom = Math.min(+$("zoom").max, curZoom() + 0.05
 
 /* ---------------- strip: tap to view, × to remove (with undo), hold and drag to reorder */
 function drawStrip() {
-  const s = $("strip"), md = S.photos.length ? mode() : null; s.innerHTML = "";
+  const s = $("strip"), al = S.app === "align", md = al && S.photos.length ? mode() : null; s.innerHTML = "";
   S.photos.forEach((p, i) => {
     const b = document.createElement("div"); b.className = "th" + (p.id === S.selId ? " on" : ""); b.dataset.id = p.id;
     b.setAttribute("role", "button"); b.tabIndex = 0; b.setAttribute("aria-label", (p.id === S.refId ? "Reference, " : "") + `photo ${i + 1}`);
@@ -626,8 +692,8 @@ function drawStrip() {
     const n = document.createElement("span"); n.className = "n"; n.textContent = i + 1; b.appendChild(n);
     if (p.id === S.refId) { const r = document.createElement("span"); r.className = "lbl ref"; r.textContent = "REF"; b.appendChild(r); }
     const isSel = p.id === S.selId && p.id !== S.refId && !S.editing;
-    const c = S.lay?.crops.get(p.id), check = c && p.id !== S.refId && (c.shift > 0.02 || (S.quality === "best" && c.w < IG));
-    if (missing(p, md) && !isSel) { const m = document.createElement("span"); m.className = "miss"; m.textContent = "!"; b.appendChild(m); }
+    const c = al && S.lay?.crops.get(p.id), check = c && p.id !== S.refId && (c.shift > 0.02 || (S.quality === "best" && c.w < IG));
+    if (al && missing(p, md) && !isSel) { const m = document.createElement("span"); m.className = "miss"; m.textContent = "!"; b.appendChild(m); }
     else if (check && !isSel) { const m = document.createElement("span"); m.className = "dot"; b.appendChild(m); b.setAttribute("aria-label", b.getAttribute("aria-label") + ", has a note"); }
     if (isSel) {
       const x = document.createElement("button"); x.className = "x"; x.setAttribute("aria-label", `Remove photo ${i + 1}`);
@@ -638,10 +704,10 @@ function drawStrip() {
     b.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { S.selId = p.id; render(); } };
     s.appendChild(b);
   });
-  if (S.refId && !S.editing) {
-    const add = document.createElement("button"); add.className = "th add"; add.setAttribute("aria-label", "Add photos to fix");
+  if ((al ? S.refId : S.photos.length) && !S.editing) {
+    const add = document.createElement("button"); add.className = "th add"; add.setAttribute("aria-label", al ? "Add photos to fix" : "Add photos");
     add.innerHTML = `<svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>`;
-    add.onclick = () => $("moreFile").click(); s.appendChild(add);
+    add.onclick = () => { if (!ER.busy) $(al ? "moreFile" : "rmFile").click(); }; s.appendChild(add);
   }
 }
 function removePhoto(p) {
@@ -652,7 +718,7 @@ function removePhoto(p) {
 (() => { // long-press reorder (touch + mouse); a quick tap selects
   const strip = $("strip"); let t = 0, item = null, dragging = false, sx = 0, sy = 0, moved = false;
   const start = (x, y, target) => {
-    item = target.closest(".th:not(.add)"); if (!item || target.closest(".x") || S.editing) { item = null; return; }
+    item = target.closest(".th:not(.add)"); if (!item || target.closest(".x") || S.editing || ER.busy) { item = null; return; }
     sx = x; sy = y; moved = false; dragging = false;
     t = setTimeout(() => { dragging = true; item.classList.add("lift"); navigator.vibrate?.(10); }, 380);
   };
@@ -723,10 +789,9 @@ function drawEditor() {
 $("adjustBtn").onclick = (e) => { e.stopPropagation(); openEditor(); };
 $("edReset").onclick = () => { sel().manual = null; drawEditor(); };
 $("doneBtn").onclick = () => {
-  if (S.editing === "erase") return closeEraser(true);
   const p = sel(); if (!p.manual && !auto(p)) p.manual = { ...fallback(p) }; S.editing = false; render();
 };
-$("cancelBtn").onclick = () => { if (S.editing === "erase") return closeEraser(false); Object.assign(sel(), edSnap); S.editing = false; render(); };
+$("cancelBtn").onclick = () => { Object.assign(sel(), edSnap); S.editing = false; render(); };
 
 /* ---------------- remove people and objects: select first (tap = MediaPipe Magic Touch, drag = brush), then Remove (MI-GAN fill) */
 // Each removal is stored as a patch in original pixel coordinates with a soft-edged alpha mask and the photo's measured grain.
@@ -774,27 +839,14 @@ function rebuildMid(p) {
 }
 
 // state: sel = red selection at preview (mid) resolution; hist = earlier selections for Undo
-const ER = { start: 0, busy: "", before: false, sel: null, any: false, hist: [], brush: 1, ready: false };
+const ER = { pid: null, start: 0, busy: "", before: false, sel: null, any: false, hist: [], brush: 1, ready: false };
 function erNote() {
   sub(!ER.ready ? "Loading Remove… first time about 45 MB" : ER.before ? "Before" : ER.busy ? ER.busy :
     ER.any ? "Tap to add more, tap red to take it away" : "Tap what to remove, or paint over it");
 }
-async function openEraser() {
-  const p = sel(); S.editing = "erase";
-  Object.assign(ER, { start: p.edits.length, sel: null, any: false, hist: [], busy: "", before: false, ready: !!inpaint });
-  render();
-  try { await loadEraser(); if (S.editing !== "erase" || sel() !== p) return; ER.ready = true; drawEraser(); }
-  catch (e) { console.warn(e); toast(e.message || "Remove could not load.", 4000); closeEraser(false); }
-}
-async function closeEraser(keep) {
-  const p = sel(), changed = p.edits.length !== ER.start;
-  if (!keep && changed) { p.edits.length = ER.start; rebuildMid(p); }
-  ER.sel = null; ER.hist = [];
-  S.editing = false; render();
-  if (keep && changed) { // people may be gone now: look again so the subject is not a removed person
-    const sm = scaled(p.mid.c, p.mid.c.width, p.mid.c.height, DETECT);
-    p.est = await detect(sm.c, 1 / (p.mid.s * sm.s)); p.pick = null; sm.c.width = 0; render();
-  }
+async function warmEraser() { // starts the ~45 MB download as soon as the tool has photos
+  try { await loadEraser(); if (S.app === "remove") render(); }
+  catch (e) { console.warn(e); toast(e.message || "Remove could not load. Check the connection and try again.", 4000); }
 }
 function drawEraser() {
   const p = sel(), el = $("eraser"), cv = $("erCan"), mk = $("erMask");
@@ -813,7 +865,7 @@ function drawEraser() {
   dot.style.width = dot.style.height = Math.round(r * 0.9) + "px"; $("erBrush").setAttribute("aria-label", `Brush size: ${name}`);
   $("erUndo").disabled = !!ER.busy || !ER.ready || (!ER.hist.length && p.edits.length <= ER.start);
   $("erGo").disabled = !!ER.busy || !ER.ready || !ER.any;
-  erNote();
+  erNote(); syncSave();
 }
 function blank(p) { const c = document.createElement("canvas"); c.width = p.mid.c.width; c.height = p.mid.c.height; return c; }
 function snapshot(p) { const c = blank(p); if (ER.sel) c.getContext("2d").drawImage(ER.sel, 0, 0); ER.hist.push(ER.sel); if (ER.hist.length > 12) ER.hist.shift(); ER.sel = c; return c.getContext("2d"); }
@@ -1003,10 +1055,23 @@ $("erUndo").onclick = () => {
 };
 $("erGo").onclick = removeSelected;
 $("erBrush").onclick = () => { ER.brush = (ER.brush + 1) % BRUSH.length; drawEraser(); toast(`Brush: ${BRUSH[ER.brush][0]}`, 1200); };
-$("removeBtn").onclick = (e) => { e.stopPropagation(); openEraser(); };
 
 /* ---------------- adding photos */
-$("emptyCta").onclick = () => (ref() ? $("moreFile") : $("refFile")).click();
+$("emptyCta").onclick = () => { if (S.app === "remove") { loadEraser().catch(() => {}); return $("rmFile").click(); } (ref() ? $("moreFile") : $("refFile")).click(); };
+$("goAlign").onclick = () => enter("align");
+$("goRemove").onclick = () => enter("remove");
+$("backBtn").onclick = goHome;
+$("rmFile").onchange = async (e) => {
+  const files = [...e.target.files]; e.target.value = ""; if (!files.length) return;
+  let first = null;
+  for (let i = 0; i < files.length; i++) {
+    toast(files.length > 1 ? `Reading ${i + 1} of ${files.length}…` : "Reading photo…", 15000);
+    try { const p = await makePhoto(files[i], false); S.photos.push(p); first ??= p; } catch (err) { toast(err.message); }
+  }
+  $("toast").hidden = true;
+  if (first) S.selId = first.id;
+  render(); warmEraser();
+};
 $("refFile").onchange = async (e) => {
   const f = e.target.files[0]; e.target.value = ""; if (!f) return;
   toast("Reading photo…", 15000);
@@ -1037,10 +1102,10 @@ $("moreFile").onchange = async (e) => {
 function syncMenu() {
   $("qGroup").querySelectorAll(".opt").forEach((b) => b.setAttribute("aria-pressed", b.dataset.q === S.quality));
   $("fGroup").querySelectorAll(".opt").forEach((b) => b.setAttribute("aria-pressed", b.dataset.f === S.fmt));
-  $("optGuides").setAttribute("aria-pressed", S.guides);
-  $("optRef").hidden = !sel() || sel().id === S.refId || S.photos.length < 2;
+  $("optGuides").setAttribute("aria-pressed", S.guides); $("optGuides").hidden = S.app !== "align";
+  $("optRef").hidden = S.app !== "align" || !sel() || sel().id === S.refId || S.photos.length < 2;
   $("optNew").hidden = !S.photos.length;
-  $("optNew").firstElementChild.textContent = "Start a new photo set";
+  $("optNew").firstElementChild.textContent = S.app === "align" ? "Start a new photo set" : "Start over";
 }
 $("moreBtn").onclick = () => { syncMenu(); $("menu").hidden = false; };
 $("menuClose").onclick = () => ($("menu").hidden = true);
@@ -1053,10 +1118,11 @@ let armed = 0;
 $("optNew").onclick = () => {
   const b = $("optNew");
   if (Date.now() - armed > 3000) { armed = Date.now(); b.firstElementChild.textContent = "Tap again to remove all photos"; return; }
-  Object.assign(S, { photos: [], refId: null, selId: null, zoom: null, editing: false, save: null, lay: null });
+  if (ER.busy) return;
+  Object.assign(S, fresh(), { editing: false }); Object.assign(ER, { pid: null, sel: null, hist: [], any: false });
   $("menu").hidden = true; render();
 };
-addEventListener("resize", () => { if (S.editing === "erase") drawEraser(); else if (S.editing) drawEditor(); else if (S.lay && !$("view").hidden) stage(); });
+addEventListener("resize", () => { if (S.app === "remove" && sel()) drawEraser(); else if (S.editing) drawEditor(); else if (S.lay && !$("view").hidden) stage(); });
 
 /* ---------------- save: pixel-exact crops from the original, Display P3, date taken kept, iOS share sheet */
 function render2d(w, h) {
@@ -1089,18 +1155,19 @@ async function exportCanvas(p, crop) {
 }
 // Builds photos from `from` until about BATCH_BYTES, so a big set never sits in memory at once.
 async function buildBatch(from) {
-  const lay = layout(), files = [], ext = S.fmt === "image/png" ? "png" : "jpg", n = S.photos.length;
+  const lay = S.app === "align" ? layout() : null, list = targets(), files = [], ext = S.fmt === "image/png" ? "png" : "jpg", n = list.length;
   let bytes = 0, i = from;
   for (; i < n && (files.length === 0 || bytes < BATCH_BYTES); i++) {
     $("saveBtn").textContent = `${i + 1}/${n}`;
     await new Promise((r) => setTimeout(r, 16));
-    const p = S.photos[i], c = await exportCanvas(p, lay.crops.get(p.id));
+    const p = list[i], c = await exportCanvas(p, cropOf(p, lay));
     let blob = await new Promise((r) => c.toBlob(r, S.fmt, S.fmt === "image/png" ? undefined : 0.95));
     c.width = 0;
     if (!blob || !blob.size) throw new Error(`Photo ${i + 1} could not be made. Try Instagram size in ⋯.`);
     if (S.fmt === "image/jpeg" && p.date) blob = await withExif(blob, p.date);
     bytes += blob.size;
-    files.push(new File([blob], `${String(i + 1).padStart(2, "0")}_${p.name}.${ext}`, { type: S.fmt, lastModified: p.date ? dateMs(p.date) : Date.now() }));
+    const name = S.app === "align" ? `${String(i + 1).padStart(2, "0")}_${p.name}` : `${p.name}_edited`;
+    files.push(new File([blob], `${name}.${ext}`, { type: S.fmt, lastModified: p.date ? dateMs(p.date) : Date.now() }));
   }
   return { files, from, to: i };
 }
@@ -1109,8 +1176,8 @@ async function share(files) {
   for (const f of files) { const a = document.createElement("a"); a.href = URL.createObjectURL(f); a.download = f.name; a.click(); await new Promise((r) => setTimeout(r, 300)); }
 }
 function saved(batch) {
-  const n = S.photos.length, { from, to } = batch;
-  if (to >= n) { S.save = null; toast(from === 0 ? `All ${n} of ${n} photos handed to iOS. Check Photos.` : `Photo${to - from > 1 ? "s" : ""} ${span(from + 1, n)} handed to iOS. All ${n} done.`, 4000); }
+  const n = targets().length, { from, to } = batch;
+  if (to >= n) { S.save = null; toast(from === 0 ? (n === 1 ? "Photo handed to iOS. Check Photos." : `All ${n} of ${n} photos handed to iOS. Check Photos.`) : `Photo${to - from > 1 ? "s" : ""} ${span(from + 1, n)} handed to iOS. All ${n} done.`, 4000); }
   else { S.save = { sig: signature(), next: to, files: null }; toast(`Photo${to - from > 1 ? "s" : ""} ${span(from + 1, to)} of ${n} handed to iOS. Tap Save for the rest.`, 5000); }
   syncSave();
 }
