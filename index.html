@@ -313,7 +313,7 @@ function enter(app) { S.app = app; Object.assign(S, sets[app] || fresh()); rende
 function goHome() {
   if (ER.busy) return toast("Wait for Remove to finish", 1800);
   sets[S.app] = Object.fromEntries(SET.map((k) => [k, S[k]]));
-  Object.assign(S, fresh(), { app: null, editing: false }); render();
+  Object.assign(S, fresh(), { app: null, editing: false }); clearTimeout(toastT); $("toast").hidden = true; render();
 }
 const ref = () => S.photos.find((p) => p.id === S.refId);
 const sel = () => S.photos.find((p) => p.id === S.selId);
