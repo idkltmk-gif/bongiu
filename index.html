@@ -64,6 +64,15 @@ button.tag svg { width: 14px; height: 14px; }
 .chip { position: absolute; bottom: 10px; height: 34px; padding: 0 13px; border-radius: 999px; font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; }
 .chip svg { width: 16px; height: 16px; }
 .adjust { left: 10px; }
+.rm { right: 10px; }
+.eraser { position: relative; touch-action: none; border-radius: 10px; overflow: hidden; }
+.eraser canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+#erMask { opacity: .55; }
+.er-busy { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(0,0,0,.2); }
+.er-busy span { width: 30px; height: 30px; border-radius: 50%; border: 3px solid rgba(255,255,255,.3); border-top-color: #fff; animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .er-busy span { animation: none; border-color: #fff; } }
+.btn:disabled { opacity: .35; }
 #cGhost { opacity: 0; transition: opacity .15s ease-out; }
 .view.ghost #cGhost { opacity: .5; }
 .view.ghost #cAfter { clip-path: none !important; }
@@ -176,7 +185,14 @@ button.tag svg { width: 14px; height: 14px; }
       <button class="tag glass l" id="tagL" aria-label="Switch what this photo is compared with"><span>Reference</span><svg class="i" viewBox="0 0 24 24"><path d="M7 4l-3 3 3 3M4 7h13M17 20l3-3-3-3M20 17H7"/></svg></button>
       <span class="tag glass r" id="tagR">Fixed</span>
       <div class="handle" id="handle"><div class="knob"><svg viewBox="0 0 24 24"><path d="M9 6l-6 6 6 6M15 6l6 6-6 6"/></svg></div></div>
+      <button class="chip rm glass" id="removeBtn"><svg class="i" viewBox="0 0 24 24"><path d="M7 21h10M5.5 14.5l7-7 5 5-7 7H8l-2.5-2.5a1.4 1.4 0 0 1 0-2zM9.5 10.5l5 5"/></svg><span>Remove</span></button>
       <button class="chip adjust glass" id="adjustBtn"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="9" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg><span>Adjust subject</span></button>
+    </div>
+
+    <div class="eraser" id="eraser" hidden>
+      <canvas id="erCan" aria-label="Tap or paint what to remove"></canvas>
+      <canvas id="erMask"></canvas>
+      <div class="er-busy" id="erBusy" hidden><span></span></div>
     </div>
 
     <div class="editor" id="editor" hidden>
@@ -196,6 +212,10 @@ button.tag svg { width: 14px; height: 14px; }
     <div class="edit-row" id="editRow" hidden>
       <span id="editHint">Drag onto the head. The dot resizes.</span>
       <button class="btn glass" id="edReset">Use detected</button>
+    </div>
+    <div class="edit-row" id="eraseRow" hidden>
+      <span id="eraseHint">Tap what to remove, or paint over it.</span>
+      <button class="btn glass" id="erUndo">Undo</button>
     </div>
   </section>
 
@@ -308,38 +328,44 @@ async function makePhoto(file) {
   const loaded = await loadImg(file), { img } = loaded;
   const W = img.naturalWidth, H = img.naturalHeight, small = scaled(img, W, H, DETECT), mid = scaled(img, W, H, MID);
   release(loaded); // keep only small copies in memory; the full photo is decoded again at save time
-  const thumb = scaled(mid.c, mid.c.width, mid.c.height, 180).c.toDataURL("image/jpeg", 0.8);
   // pick: null = automatic (same person as on the reference when the head count matches)
-  const p = { id: S.nextId++, file, name: file.name.replace(/\.[^.]+$/, "") || "photo", W, H, mid, thumb, date: await readDate(file), est: { faces: [], poses: [], objects: [] }, pick: null, manual: null };
-  const k = 1 / small.s, breathe = () => new Promise((r) => setTimeout(r, 0)); // let the screen update between models
+  // mid0 = clean preview; mid = preview with removals applied; edits = removals in original pixel coordinates
+  const p = { id: S.nextId++, file, name: file.name.replace(/\.[^.]+$/, "") || "photo", W, H, mid, mid0: mid, edits: [], thumb: "", date: await readDate(file), est: null, pick: null, manual: null };
+  p.thumb = thumbOf(p);
+  p.est = await detect(small.c, 1 / small.s);
+  small.c.width = 0;
+  return p;
+}
+const thumbOf = (p) => scaled(p.mid.c, p.mid.c.width, p.mid.c.height, 180).c.toDataURL("image/jpeg", 0.8);
+async function detect(c, k) {
+  const est = { faces: [], poses: [], objects: [] }, breathe = () => new Promise((r) => setTimeout(r, 0)); // let the screen update between models
   await ready; await breathe();
   if (faceDet) {
     try {
-      p.est.faces = big((faceDet.detect(small.c).detections || []).map(({ boundingBox: b }) => ({ cx: (b.originX + b.width / 2) * k, cy: (b.originY + b.height / 2) * k, h: b.height * k, kind: "head" })).sort((a, b) => b.h - a.h));
+      est.faces = big((faceDet.detect(c).detections || []).map(({ boundingBox: b }) => ({ cx: (b.originX + b.width / 2) * k, cy: (b.originY + b.height / 2) * k, h: b.height * k, kind: "head" })).sort((a, b) => b.h - a.h));
     } catch (e) { console.warn(e); }
     await breathe();
   }
   if (poseDet) {
     try {
-      const w = small.c.width * k, h = small.c.height * k;
-      p.est.poses = big((poseDet.detect(small.c).landmarks || []).flatMap((lm) => {
+      const w = c.width * k, h = c.height * k;
+      est.poses = big((poseDet.detect(c).landmarks || []).flatMap((lm) => {
         if ((lm[11].visibility ?? 1) < 0.3 || (lm[12].visibility ?? 1) < 0.3) return [];
         const nx = lm[0].x * w, ny = lm[0].y * h, sx = ((lm[11].x + lm[12].x) / 2) * w, sy = ((lm[11].y + lm[12].y) / 2) * h, d = Math.hypot(sx - nx, sy - ny);
         return d > 4 ? [{ cx: nx, cy: ny, h: d * 0.9, kind: "head" }] : []; // nose->shoulders ≈ 1.1 head boxes; calibrated against faces when possible
       }).sort((a, b) => b.h - a.h));
     } catch (e) { console.warn(e); }
   }
-  if (!p.est.faces.length && !p.est.poses.length) {
+  if (!est.faces.length && !est.poses.length) {
     const od = await objectDetector();
     if (od) {
       try {
-        p.est.objects = big((od.detect(small.c).detections || []).filter((x) => x.categories?.[0]?.categoryName !== "person")
+        est.objects = big((od.detect(c).detections || []).filter((x) => x.categories?.[0]?.categoryName !== "person")
           .map(({ boundingBox: b }) => ({ cx: (b.originX + b.width / 2) * k, cy: (b.originY + b.height / 2) * k, h: b.height * k, w: b.width * k, kind: "object" })).sort((a, b) => b.h * b.w - a.h * a.w));
       } catch (e) { console.warn(e); }
     }
   }
-  small.c.width = 0;
-  return p;
+  return est;
 }
 
 /* ---------------- date taken: read from the original, written back into saved JPEGs */
@@ -481,7 +507,7 @@ function render() {
   $("moreBtn").hidden = S.editing; $("cancelBtn").hidden = !S.editing;
   $("saveBtn").hidden = S.editing; $("doneBtn").hidden = !S.editing;
   $("saveBtn").disabled = !ok;
-  $("title").textContent = S.editing ? "Adjust subject" : ok && p ? (p.id === S.refId ? "Reference" : `Photo ${idx(p) + 1} of ${n}`) : "Even Frames";
+  $("title").textContent = S.editing ? (S.editing === "erase" ? "Remove" : "Adjust subject") : ok && p ? (p.id === S.refId ? "Reference" : `Photo ${idx(p) + 1} of ${n}`) : "Even Frames";
   if (!ok) sub(S.status);
   $("empty").hidden = ok || S.editing;
   $("st1").className = R ? "done" : ""; $("st2").className = n > 1 ? "done" : "";
@@ -491,9 +517,9 @@ function render() {
   $("controls").hidden = !ok && !S.editing;
   $("stripWrap").hidden = !R;
   $("stripHint").hidden = n < 3 || S.editing || store.get("ef-reordered") === "1";
-  $("ratios").hidden = $("zoomRow").hidden = S.editing; $("editRow").hidden = !S.editing;
-  if (S.editing) { drawStrip(); return drawEditor(); }
-  $("editor").hidden = true;
+  $("ratios").hidden = $("zoomRow").hidden = !!S.editing; $("editRow").hidden = S.editing !== "subject"; $("eraseRow").hidden = S.editing !== "erase";
+  if (S.editing) { drawStrip(); return S.editing === "erase" ? drawEraser() : drawEditor(); }
+  $("editor").hidden = $("eraser").hidden = true;
   $("view").hidden = !ok;
   if (!ok) { S.lay = null; drawStrip(); syncSave(); return; }
   drawRatios();
@@ -501,7 +527,7 @@ function render() {
 }
 // anything that changes the saved files restarts a batched save
 const span = (a, b) => (a === b ? `${a}` : `${a}–${b}`);
-const signature = () => JSON.stringify([S.ratio, S.lay?.zoom.toFixed(4), S.quality, S.fmt, S.refId, S.photos.map((p) => [p.id, p.pick, p.manual && [p.manual.cx, p.manual.cy, p.manual.h]])]);
+const signature = () => JSON.stringify([S.ratio, S.lay?.zoom.toFixed(4), S.quality, S.fmt, S.refId, S.photos.map((p) => [p.id, p.pick, p.edits.length, p.manual && [p.manual.cx, p.manual.cy, p.manual.h]])]);
 function syncSave() {
   if (S.save && S.save.sig !== signature()) S.save = null;
   const b = $("saveBtn"), n = S.photos.length;
@@ -651,10 +677,10 @@ function removePhoto(p) {
 
 /* ---------------- subject editor: drag the ring, or tap another detected person */
 let edSnap = null;
-function openEditor() { const p = sel(); edSnap = { manual: p.manual, pick: p.pick }; S.editing = true; render(); }
+function openEditor() { const p = sel(); edSnap = { manual: p.manual, pick: p.pick }; S.editing = "subject"; render(); }
 function drawEditor() {
   const p = sel(), ed = $("editor"), cv = $("edCan"), s = subj(p), box = $("edBox");
-  $("view").hidden = true; ed.hidden = false;
+  $("view").hidden = $("eraser").hidden = true; ed.hidden = false;
   const [w, h] = fitBox(p.W / p.H), key = p.id + ":" + w;
   ed.style.width = w + "px"; ed.style.height = h + "px"; cv.style.width = w + "px"; cv.style.height = h + "px";
   if (cv.dataset.key !== key) {
@@ -692,8 +718,178 @@ function drawEditor() {
 })();
 $("adjustBtn").onclick = (e) => { e.stopPropagation(); openEditor(); };
 $("edReset").onclick = () => { sel().manual = null; drawEditor(); };
-$("doneBtn").onclick = () => { const p = sel(); if (!p.manual && !auto(p)) p.manual = { ...fallback(p) }; S.editing = false; render(); };
-$("cancelBtn").onclick = () => { Object.assign(sel(), edSnap); S.editing = false; render(); };
+$("doneBtn").onclick = () => {
+  if (S.editing === "erase") return closeEraser(true);
+  const p = sel(); if (!p.manual && !auto(p)) p.manual = { ...fallback(p) }; S.editing = false; render();
+};
+$("cancelBtn").onclick = () => { if (S.editing === "erase") return closeEraser(false); Object.assign(sel(), edSnap); S.editing = false; render(); };
+
+/* ---------------- remove people and objects: tap to select (MediaPipe Magic Touch) or paint, then fill (MI-GAN) */
+// Each removal is stored as a patch in original pixel coordinates with a soft-edged alpha mask.
+// Only the patch area is replaced; every other pixel of the photo stays untouched.
+let segmenter = null, inpaint = null, eraserLoading = null;
+const ER_MAX = 1024; // longest side of the area handed to the fill model (it works at 512 internally)
+function loadScript(src) { return new Promise((res, rej) => { const t = document.createElement("script"); t.src = src; t.onload = res; t.onerror = () => rej(new Error("Couldn't load " + src)); document.head.appendChild(t); }); }
+function loadEraser() {
+  return (eraserLoading ??= (async () => {
+    await ready;
+    if (!vision) throw new Error("Remove needs the detection engine, which did not load.");
+    if (!window.ort) await loadScript(base + "ort.wasm.min.js");
+    ort.env.wasm.wasmPaths = base; ort.env.wasm.numThreads = 1;
+    [segmenter, inpaint] = await Promise.all([
+      vision.InteractiveSegmenter.createFromOptions(fileset, { baseOptions: { modelAssetPath: base + "magic_touch.tflite", delegate: "CPU" }, outputCategoryMask: true, outputConfidenceMasks: false }),
+      ort.InferenceSession.create(base + "migan_pipeline_v2.onnx", { executionProviders: ["wasm"] }),
+    ]);
+    keepOffline(["mp/ort.wasm.min.js", "mp/ort-wasm-simd.wasm", "mp/magic_touch.tflite", "mp/migan_pipeline_v2.onnx"]);
+  })().catch((e) => { eraserLoading = null; throw e; }));
+}
+function drawEdits(x, p, ox, oy, k, edits = p.edits) { for (const e of edits) x.drawImage(e.patch, (e.x - ox) * k, (e.y - oy) * k, e.w * k, e.h * k); }
+function rebuildMid(p) {
+  if (p.mid !== p.mid0) p.mid.c.width = 0;
+  if (!p.edits.length) { p.mid = p.mid0; } else {
+    const c = document.createElement("canvas"); c.width = p.mid0.c.width; c.height = p.mid0.c.height;
+    const x = c.getContext("2d"); x.imageSmoothingQuality = "high"; x.drawImage(p.mid0.c, 0, 0); drawEdits(x, p, 0, 0, p.mid0.s);
+    p.mid = { c, s: p.mid0.s };
+  }
+  p.thumb = thumbOf(p);
+}
+const ER = { src: null, start: 0, busy: false, before: false, mask: null };
+async function openEraser() {
+  const p = sel(); S.editing = "erase"; ER.start = p.edits.length; ER.mask = null; render();
+  sub("Loading Remove… first time about 45 MB");
+  try {
+    const [loaded] = await Promise.all([loadImg(p.file), loadEraser()]);
+    if (S.editing !== "erase" || sel() !== p) return release(loaded);
+    ER.src = loaded; sub("");
+  } catch (e) { console.warn(e); toast(e.message || "Remove could not load.", 4000); closeEraser(false); }
+}
+async function closeEraser(keep) {
+  const p = sel(), changed = p.edits.length !== ER.start || !keep;
+  if (!keep && p.edits.length !== ER.start) { p.edits.length = ER.start; rebuildMid(p); }
+  if (ER.src) { release(ER.src); ER.src = null; }
+  S.editing = false; render();
+  if (keep && changed) { // people may be gone now: look again so the subject is not a removed person
+    const sm = scaled(p.mid.c, p.mid.c.width, p.mid.c.height, DETECT);
+    p.est = await detect(sm.c, 1 / (p.mid.s * sm.s)); p.pick = null; sm.c.width = 0; render();
+  }
+}
+function drawEraser() {
+  const p = sel(), el = $("eraser"), cv = $("erCan"), mk = $("erMask");
+  $("view").hidden = $("editor").hidden = true; el.hidden = false;
+  const [w, h] = fitBox(p.W / p.H); el.style.width = w + "px"; el.style.height = h + "px";
+  const d = Math.min(2, devicePixelRatio || 1), src = ER.before ? p.mid0 : p.mid;
+  cv.width = Math.round(w * d); cv.height = Math.round(h * d);
+  const x = cv.getContext("2d"); x.imageSmoothingQuality = "high"; x.drawImage(src.c, 0, 0, cv.width, cv.height);
+  if (mk.width !== cv.width || mk.height !== cv.height) { mk.width = cv.width; mk.height = cv.height; }
+  const mx = mk.getContext("2d"); mx.clearRect(0, 0, mk.width, mk.height);
+  if (ER.mask && !ER.before) mx.drawImage(ER.mask, 0, 0, mk.width, mk.height);
+  $("erBusy").hidden = !ER.busy;
+  $("erUndo").disabled = ER.busy || p.edits.length <= ER.start;
+  $("eraseHint").textContent = ER.before ? "Before" : ER.busy ? "Removing…" : "Tap what to remove, or paint over it. Hold to see before.";
+}
+// mask canvases live at the preview (mid) resolution; red = remove
+function newMask(p) { const c = document.createElement("canvas"); c.width = p.mid.c.width; c.height = p.mid.c.height; return c; }
+function grow(src, r) { // dilate a mask by r px so edges, hair and soft shadows go too
+  const c = newMask({ mid: { c: src } }), x = c.getContext("2d");
+  for (let a = 0; a < 16; a++) x.drawImage(src, Math.cos((a / 16) * 2 * Math.PI) * r, Math.sin((a / 16) * 2 * Math.PI) * r);
+  x.drawImage(src, 0, 0); return c;
+}
+function bboxOf(c) {
+  const { width: W, height: H } = c, d = c.getContext("2d").getImageData(0, 0, W, H).data;
+  let x0 = W, y0 = H, x1 = -1, y1 = -1;
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (d[(y * W + x) * 4 + 3] > 127) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+  return x1 < 0 ? null : { x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1 };
+}
+async function selectAt(p, nx, ny) {
+  const res = segmenter.segment(p.mid.c, { keypoint: { x: nx, y: ny } });
+  try {
+    const m = res.categoryMask, W = m.width, H = m.height, v = m.getAsUint8Array(), at = v[Math.min(H - 1, Math.floor(ny * H)) * W + Math.min(W - 1, Math.floor(nx * W))];
+    const c = document.createElement("canvas"); c.width = W; c.height = H;
+    const x = c.getContext("2d"), img = x.createImageData(W, H);
+    for (let i = 0; i < v.length; i++) if (v[i] === at) { img.data[i * 4] = 255; img.data[i * 4 + 1] = 59; img.data[i * 4 + 2] = 48; img.data[i * 4 + 3] = 255; }
+    x.putImageData(img, 0, 0);
+    const out = newMask(p); out.getContext("2d").drawImage(c, 0, 0, out.width, out.height); c.width = 0;
+    return out;
+  } finally { res.close?.(); }
+}
+async function removeMask(p, mask, pad) {
+  const g = grow(mask, pad), b = bboxOf(g); if (!b) return false;
+  const s = p.mid.s, side = Math.max(b.w, b.h), m = side * 0.6 + 24; // context around the area helps the fill
+  const R = { x: Math.max(0, (b.x - m) / s), y: Math.max(0, (b.y - m) / s) };
+  R.w = Math.min(p.W, (b.x + b.w + m) / s) - R.x; R.h = Math.min(p.H, (b.y + b.h + m) / s) - R.y;
+  R.x = Math.floor(R.x); R.y = Math.floor(R.y); R.w = Math.ceil(R.w); R.h = Math.ceil(R.h);
+  const k = Math.min(1, ER_MAX / Math.max(R.w, R.h)), sw = Math.max(8, Math.round(R.w * k)), sh = Math.max(8, Math.round(R.h * k));
+  // the area as it looks now: original pixels plus earlier removals
+  const src = document.createElement("canvas"); src.width = sw; src.height = sh;
+  const sx = src.getContext("2d"); sx.imageSmoothingQuality = "high";
+  drawDown(sx, ER.src.img, R.x, R.y, R.w, R.h, 0, 0, sw, sh); drawEdits(sx, p, R.x, R.y, sw / R.w);
+  const mc = document.createElement("canvas"); mc.width = sw; mc.height = sh;
+  const mx = mc.getContext("2d"); mx.drawImage(g, R.x * s, R.y * s, R.w * s, R.h * s, 0, 0, sw, sh);
+  const px = sx.getImageData(0, 0, sw, sh).data, mm = mx.getImageData(0, 0, sw, sh).data, n = sw * sh;
+  const img = new Uint8Array(3 * n), keep = new Uint8Array(n);
+  for (let i = 0; i < n; i++) { img[i] = px[i * 4]; img[n + i] = px[i * 4 + 1]; img[2 * n + i] = px[i * 4 + 2]; keep[i] = mm[i * 4 + 3] > 127 ? 0 : 255; }
+  const out = (await inpaint.run({ image: new ort.Tensor("uint8", img, [1, 3, sh, sw]), mask: new ort.Tensor("uint8", keep, [1, 1, sh, sw]) })).result.data;
+  // soft edge: the mask blurred by shrinking and growing it again
+  const f = Math.max(2, Math.round(Math.min(sw, sh) / 64)), sm = document.createElement("canvas");
+  sm.width = Math.max(1, Math.round(sw / f)); sm.height = Math.max(1, Math.round(sh / f));
+  const smx = sm.getContext("2d"); smx.imageSmoothingQuality = "high"; smx.drawImage(mc, 0, 0, sm.width, sm.height);
+  mx.clearRect(0, 0, sw, sh); mx.imageSmoothingQuality = "high"; mx.drawImage(sm, 0, 0, sw, sh);
+  const soft = mx.getImageData(0, 0, sw, sh).data, patch = sx.createImageData(sw, sh);
+  for (let i = 0; i < n; i++) {
+    const a = Math.max(soft[i * 4 + 3], mm[i * 4 + 3] > 127 ? 255 : 0); // fully replaced inside, soft only outside the edge
+    patch.data[i * 4] = out[i]; patch.data[i * 4 + 1] = out[n + i]; patch.data[i * 4 + 2] = out[2 * n + i]; patch.data[i * 4 + 3] = a;
+  }
+  const pc = document.createElement("canvas"); pc.width = sw; pc.height = sh; pc.getContext("2d").putImageData(patch, 0, 0);
+  src.width = mc.width = sm.width = 0;
+  p.edits.push({ ...R, patch: pc }); rebuildMid(p);
+  return true;
+}
+async function runRemoval(make) {
+  const p = sel(); if (ER.busy || !ER.src || !inpaint) return;
+  ER.busy = true; drawEraser();
+  try {
+    const mask = ER.mask || (await make(p));
+    ER.mask = mask; drawEraser(); await new Promise((r) => setTimeout(r, 30));
+    const pad = Math.max(3, Math.round(Math.max(p.mid.c.width, p.mid.c.height) * 0.008));
+    if (!(await removeMask(p, mask, pad))) toast("Nothing selected there. Try painting over it.");
+  } catch (e) { console.warn(e); toast("Couldn't remove that. Try a smaller area.", 3200); }
+  ER.mask = null; ER.busy = false; drawEraser(); drawStrip();
+}
+(() => { // tap = select the thing under the finger; drag = paint; hold still = show before
+  const el = $("eraser"); let on = false, painting = false, sx = 0, sy = 0, t = 0, last = null;
+  const toMid = (e) => { const r = el.getBoundingClientRect(), p = sel(); return [((e.clientX - r.left) / r.width) * p.mid.c.width, ((e.clientY - r.top) / r.height) * p.mid.c.height]; };
+  const dab = (a, b) => {
+    const p = sel(); ER.mask ??= newMask(p);
+    const x = ER.mask.getContext("2d"), rad = Math.max(6, (p.mid.c.width / el.clientWidth) * 16);
+    x.strokeStyle = x.fillStyle = "rgb(255,59,48)"; x.lineWidth = rad * 2; x.lineCap = "round";
+    x.beginPath(); x.moveTo(...(a || b)); x.lineTo(...b); x.stroke();
+    drawEraser();
+  };
+  el.addEventListener("pointerdown", (e) => {
+    if (ER.busy || !ER.src) return;
+    on = true; painting = false; sx = e.clientX; sy = e.clientY; last = null; try { el.setPointerCapture(e.pointerId); } catch {}
+    t = setTimeout(() => { if (on && !painting) { ER.before = true; drawEraser(); } }, 350);
+  });
+  el.addEventListener("pointermove", (e) => {
+    if (!on || ER.before) return;
+    if (!painting && Math.hypot(e.clientX - sx, e.clientY - sy) < 8) return;
+    if (!painting) { painting = true; clearTimeout(t); last = toMid({ clientX: sx, clientY: sy }); dab(null, last); }
+    const pt = toMid(e); dab(last, pt); last = pt;
+  });
+  const up = (e, cancel) => {
+    if (!on) return; on = false; clearTimeout(t);
+    if (ER.before) { ER.before = false; drawEraser(); return; }
+    if (cancel) { ER.mask = null; drawEraser(); return; }
+    if (painting) return runRemoval();
+    const r = el.getBoundingClientRect(), nx = (e.clientX - r.left) / r.width, ny = (e.clientY - r.top) / r.height;
+    runRemoval((p) => selectAt(p, clamp(nx, 0, 1), clamp(ny, 0, 1)));
+  };
+  el.addEventListener("pointerup", (e) => up(e, false));
+  el.addEventListener("pointercancel", (e) => up(e, true));
+  el.addEventListener("contextmenu", (e) => e.preventDefault());
+})();
+$("erUndo").onclick = () => { const p = sel(); if (p.edits.length > ER.start) { p.edits.pop(); rebuildMid(p); drawEraser(); drawStrip(); } };
+$("removeBtn").onclick = (e) => { e.stopPropagation(); openEraser(); };
 
 /* ---------------- adding photos */
 $("emptyCta").onclick = () => (ref() ? $("moreFile") : $("refFile")).click();
@@ -746,7 +942,7 @@ $("optNew").onclick = () => {
   Object.assign(S, { photos: [], refId: null, selId: null, zoom: null, editing: false, save: null, lay: null });
   $("menu").hidden = true; render();
 };
-addEventListener("resize", () => { if (S.editing) drawEditor(); else if (S.lay && !$("view").hidden) stage(); });
+addEventListener("resize", () => { if (S.editing === "erase") drawEraser(); else if (S.editing) drawEditor(); else if (S.lay && !$("view").hidden) stage(); });
 
 /* ---------------- save: pixel-exact crops from the original, Display P3, date taken kept, iOS share sheet */
 function render2d(w, h) {
@@ -772,6 +968,7 @@ async function exportCanvas(p, crop) {
   try {
     if (loaded.img.naturalWidth !== p.W || loaded.img.naturalHeight !== p.H) throw new Error(`Photo ${idx(p) + 1} could not be read again`);
     const out = render2d(w, h); drawDown(out.x, loaded.img, c.x, c.y, c.w, c.h, 0, 0, w, h);
+    drawEdits(out.x, p, c.x, c.y, w / c.w); // removals go only where they were made; every other pixel is the original
     return out.c;
   } finally { release(loaded); }
 }
