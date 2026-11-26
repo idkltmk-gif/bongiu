@@ -6,10 +6,10 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Even Frames">
+<meta name="apple-mobile-web-app-title" content="bôngiu">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="manifest" href="manifest.webmanifest">
-<title>Even Frames</title>
+<title>bôngiu</title>
 <style>
 /* One fixed screen: top bar / photo stage / frame + zoom controls / photo strip. Glass chrome over black, iOS system type. */
 :root {
@@ -77,7 +77,12 @@ button.tag svg { width: 14px; height: 14px; }
 .chip svg { width: 16px; height: 16px; }
 .adjust { left: 10px; }
 .eraser { position: relative; touch-action: none; border-radius: 10px; overflow: hidden; }
+.er-in { position: absolute; inset: 0; transform-origin: 0 0; }
 .eraser canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.er-fit { right: 10px; }
+/* Remove has one row of tools: give the photo the space */
+.app.rm .controls { height: 60px; grid-template-rows: 44px; padding-top: 8px; }
+.app.rm .edit-row { grid-row: auto; }
 #erMask { opacity: .55; }
 .er-busy { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(0,0,0,.2); }
 .er-busy span { width: 30px; height: 30px; border-radius: 50%; border: 3px solid rgba(255,255,255,.3); border-top-color: #fff; animation: spin .8s linear infinite; }
@@ -139,6 +144,7 @@ button.tag svg { width: 14px; height: 14px; }
 .th .n { position: absolute; left: 4px; top: 4px; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 9px; background: rgba(0,0,0,.6); font-size: 11px; font-weight: 700; display: grid; place-items: center; }
 .th .lbl { position: absolute; left: 0; right: 0; bottom: 0; font-size: 9px; font-weight: 800; letter-spacing: .06em; text-align: center; padding: 2px 0; }
 .th .lbl.ref { background: rgba(10,132,255,.92); }
+.th .lbl.ed { background: rgba(255,255,255,.92); color: #000; }
 .th .dot { position: absolute; right: 6px; top: 6px; width: 9px; height: 9px; border-radius: 50%; background: var(--warn); box-shadow: 0 0 0 1.5px rgba(0,0,0,.45); }
 .th .miss { position: absolute; right: 4px; top: 4px; width: 18px; height: 18px; border-radius: 50%; background: var(--warn); color: #000; font-size: 12px; font-weight: 800; display: grid; place-items: center; }
 .th .x { position: absolute; right: 2px; top: 2px; width: 24px; height: 24px; border-radius: 50%; background: rgba(0,0,0,.7); display: grid; place-items: center; }
@@ -183,9 +189,9 @@ button.tag svg { width: 14px; height: 14px; }
 
   <main class="stage" id="stage">
     <div class="home" id="home">
-      <h1>Even Frames</h1>
+      <h1>bôngiu</h1>
       <button class="tool glass" id="goAlign">
-        <span class="ic"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="5" width="7.5" height="14" rx="2"/><rect x="13.5" y="5" width="7.5" height="14" rx="2"/><path d="M2 10h20" stroke-dasharray="2 2.5"/></svg></span>
+        <span class="ic"><svg class="i" viewBox="0 0 24 24"><rect x="2.5" y="4" width="8.5" height="16" rx="2"/><rect x="13" y="4" width="8.5" height="16" rx="2"/><circle cx="6.75" cy="10" r="2"/><circle cx="17.25" cy="10" r="2"/><path d="M3.5 17c.8-2 1.9-3 3.25-3s2.45 1 3.25 3M14 17c.8-2 1.9-3 3.25-3s2.45 1 3.25 3"/></svg></span>
         <span class="tx"><strong>Even out a set</strong><span>Same subject size in every photo</span></span>
         <svg class="i chev" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg>
       </button>
@@ -221,8 +227,11 @@ button.tag svg { width: 14px; height: 14px; }
     </div>
 
     <div class="eraser" id="eraser" hidden>
-      <canvas id="erCan" aria-label="Tap or paint what to remove"></canvas>
-      <canvas id="erMask"></canvas>
+      <div class="er-in" id="erIn">
+        <canvas id="erCan" aria-label="Tap or paint what to remove. Pinch to zoom."></canvas>
+        <canvas id="erMask"></canvas>
+      </div>
+      <button class="chip glass er-fit" id="erFit" hidden>Fit</button>
       <div class="er-busy" id="erBusy" hidden><span></span></div>
     </div>
 
@@ -276,6 +285,7 @@ button.tag svg { width: 14px; height: 14px; }
     </div>
     <div class="group">
       <button class="opt" id="optGuides"><strong>Show guide lines</strong><span>Dashed lines at head height on every photo.</span><svg class="i ck" viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg></button>
+      <button class="opt" id="optAlign"><strong>Even out these photos</strong><span>Send them, with removals, to Even out a set.</span></button>
       <button class="opt" id="optRef"><strong>Make this photo the reference</strong><span>Other photos will match this one instead.</span></button>
       <button class="opt danger" id="optNew"><strong>Start a new photo set</strong><span>Removes all photos from this screen.</span></button>
     </div>
@@ -301,7 +311,7 @@ const SET = ["photos", "refId", "selId", "zoom", "save", "lay"], sets = {};
 const fresh = () => ({ photos: [], refId: null, selId: null, zoom: null, save: null, lay: null });
 function enter(app) { S.app = app; Object.assign(S, sets[app] || fresh()); render(); if (app === "remove" && S.photos.length) warmEraser(); }
 function goHome() {
-  if (ER.busy) return;
+  if (ER.busy) return toast("Wait for Remove to finish", 1800);
   sets[S.app] = Object.fromEntries(SET.map((k) => [k, S[k]]));
   Object.assign(S, fresh(), { app: null, editing: false }); render();
 }
@@ -546,7 +556,7 @@ function note(p, lay) { // one line, the most useful thing to know about this ph
 }
 function render() {
   const n = S.photos.length, R = ref(), ok = !!R && n > 1, p = sel(), app = S.app;
-  $("home").hidden = !!app;
+  $("home").hidden = !!app; $("app").classList.toggle("rm", app === "remove");
   $("lgroup").hidden = !app || !!S.editing; $("cancelBtn").hidden = !S.editing;
   $("saveBtn").hidden = !app || !!S.editing; $("doneBtn").hidden = !S.editing;
   if (!app) {
@@ -588,7 +598,7 @@ function renderRemove() {
   $("ratios").hidden = $("zoomRow").hidden = $("editRow").hidden = $("stripHint").hidden = true; $("eraseRow").hidden = !n;
   drawStrip();
   if (!n) { $("eraser").hidden = true; sub(""); syncSave(); return; }
-  if (ER.pid !== p.id) Object.assign(ER, { pid: p.id, start: 0, sel: null, any: false, hist: [], before: false });
+  if (ER.pid !== p.id) { Object.assign(ER, { pid: p.id, start: 0, sel: null, any: false, hist: [], before: false }); Object.assign(Z, { s: 1, x: 0, y: 0 }); }
   ER.ready = !!inpaint;
   drawEraser();
 }
@@ -601,7 +611,7 @@ function syncSave() {
   if (S.save && S.save.sig !== signature()) S.save = null;
   const b = $("saveBtn"), n = targets().length;
   if (S.app === "remove" && !S.save?.files) b.disabled = !n;
-  b.textContent = !S.save ? "Save" : S.save.files ? "Tap to save" : `Save ${span(S.save.next + 1, n)}`;
+  b.textContent = !S.save ? (S.app === "remove" && n && S.photos.length > 1 ? `Save ${n}` : "Save") : S.save.files ? "Tap to save" : `Save ${span(S.save.next + 1, n)}`;
 }
 function stage() {
   const lay = (S.lay = layout()), [w, h] = fitBox(lay.a), v = $("view"), p = sel(), isRef = p.id === S.refId;
@@ -691,6 +701,7 @@ function drawStrip() {
     const im = document.createElement("img"); im.src = p.thumb; im.alt = ""; b.appendChild(im);
     const n = document.createElement("span"); n.className = "n"; n.textContent = i + 1; b.appendChild(n);
     if (p.id === S.refId) { const r = document.createElement("span"); r.className = "lbl ref"; r.textContent = "REF"; b.appendChild(r); }
+    else if (!al && p.edits.length) { const r = document.createElement("span"); r.className = "lbl ed"; r.textContent = "EDITED"; b.appendChild(r); b.setAttribute("aria-label", b.getAttribute("aria-label") + ", edited"); }
     const isSel = p.id === S.selId && p.id !== S.refId && !S.editing;
     const c = al && S.lay?.crops.get(p.id), check = c && p.id !== S.refId && (c.shift > 0.02 || (S.quality === "best" && c.w < IG));
     if (al && missing(p, md) && !isSel) { const m = document.createElement("span"); m.className = "miss"; m.textContent = "!"; b.appendChild(m); }
@@ -842,7 +853,14 @@ function rebuildMid(p) {
 const ER = { pid: null, start: 0, busy: "", before: false, sel: null, any: false, hist: [], brush: 1, ready: false };
 function erNote() {
   sub(!ER.ready ? "Loading Remove… first time about 45 MB" : ER.before ? "Before" : ER.busy ? ER.busy :
-    ER.any ? "Tap to add more, tap red to take it away" : "Tap what to remove, or paint over it");
+    ER.any ? "Tap Remove. Tap red to take it away." : sel()?.edits.length ? "Hold the photo to see before" : "Tap what to remove, or paint over it");
+}
+// zoom of the Remove view: scale and offset in screen points (two fingers pinch and pan; a trackpad pinches and scrolls)
+const Z = { s: 1, x: 0, y: 0 }, ZMAX = 6;
+function setZoom(s, x, y) {
+  const el = $("eraser"), w = el.clientWidth, h = el.clientHeight;
+  Z.s = clamp(s, 1, ZMAX); Z.x = clamp(x, w - w * Z.s, 0); Z.y = clamp(y, h - h * Z.s, 0);
+  $("erIn").style.transform = `translate(${Z.x}px, ${Z.y}px) scale(${Z.s})`; $("erFit").hidden = Z.s < 1.02;
 }
 async function warmEraser() { // starts the ~45 MB download as soon as the tool has photos
   try { await loadEraser(); if (S.app === "remove") render(); }
@@ -852,11 +870,13 @@ function drawEraser() {
   const p = sel(), el = $("eraser"), cv = $("erCan"), mk = $("erMask");
   $("view").hidden = $("editor").hidden = true; el.hidden = false;
   const [w, h] = fitBox(p.W / p.H); el.style.width = w + "px"; el.style.height = h + "px";
-  const d = Math.min(2, devicePixelRatio || 1), src = ER.before ? p.mid0 : p.mid;
-  if (cv.width !== Math.round(w * d) || cv.dataset.v !== String(src.c.width + ":" + p.edits.length + ER.before)) {
-    cv.width = Math.round(w * d); cv.height = Math.round(h * d); cv.dataset.v = src.c.width + ":" + p.edits.length + ER.before;
-    const x = cv.getContext("2d"); x.imageSmoothingQuality = "high"; x.drawImage(src.c, 0, 0, cv.width, cv.height);
+  // drawn at preview resolution (not screen size) so it stays sharp when zoomed in
+  const src = ER.before ? p.mid0 : p.mid, key = p.id + ":" + src.c.width + ":" + p.edits.length + ER.before;
+  if (cv.dataset.v !== key) {
+    cv.width = src.c.width; cv.height = src.c.height; cv.dataset.v = key;
+    cv.getContext("2d").drawImage(src.c, 0, 0);
   }
+  setZoom(Z.s, Z.x, Z.y);
   if (mk.width !== cv.width || mk.height !== cv.height) { mk.width = cv.width; mk.height = cv.height; }
   const mx = mk.getContext("2d"); mx.clearRect(0, 0, mk.width, mk.height);
   if (ER.sel && !ER.before) mx.drawImage(ER.sel, 0, 0, mk.width, mk.height);
@@ -1016,37 +1036,66 @@ async function removeSelected() {
   finally { if (loaded) release(loaded); }
   rebuildMid(p); ER.busy = ""; drawEraser(); drawStrip();
 }
-(() => { // tap = select the thing under the finger (tap red = take it away); drag = paint; hold still = show before
-  const el = $("eraser"); let on = false, painting = false, sx = 0, sy = 0, t = 0, last = null, ctx = null;
-  const toMid = (e) => { const r = el.getBoundingClientRect(), p = sel(); return [((e.clientX - r.left) / r.width) * p.mid.c.width, ((e.clientY - r.top) / r.height) * p.mid.c.height]; };
+(() => { // one finger: tap = select (tap red = take it away), drag = paint, hold still = before. Two fingers: pinch and pan.
+  const el = $("eraser"), pts = new Map(); let on = false, painting = false, pinch = null, sx = 0, sy = 0, t = 0, last = null, ctx = null;
+  const local = (e) => { const r = el.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+  const photoRect = () => $("erIn").getBoundingClientRect();
+  const toMid = (e) => { const r = photoRect(), p = sel(); return [((e.clientX - r.left) / r.width) * p.mid.c.width, ((e.clientY - r.top) / r.height) * p.mid.c.height]; };
   const dab = (a, b) => {
-    const p = sel(), rad = (p.mid.c.width / el.clientWidth) * BRUSH[ER.brush][1];
+    const p = sel(), rad = (p.mid.c.width / photoRect().width) * BRUSH[ER.brush][1]; // same size on screen at any zoom
     ctx.strokeStyle = "rgb(255,59,48)"; ctx.lineWidth = rad * 2; ctx.lineCap = ctx.lineJoin = "round";
     ctx.beginPath(); ctx.moveTo(...(a || b)); ctx.lineTo(...b); ctx.stroke(); drawEraser();
   };
+  const startPinch = () => {
+    clearTimeout(t);
+    if (painting) { ER.sel = ER.hist.pop() ?? null; ER.any = !!(ER.sel && alphaBox(ER.sel, 4)); } // the stroke the first finger began was the start of a pinch
+    ER.before = false; on = painting = false;
+    const [a, b] = [...pts.values()];
+    pinch = { d: Math.hypot(a[0] - b[0], a[1] - b[1]) || 1, m: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2], s: Z.s, x: Z.x, y: Z.y };
+    drawEraser();
+  };
   el.addEventListener("pointerdown", (e) => {
-    if (ER.busy || !ER.ready) return;
-    on = true; painting = false; sx = e.clientX; sy = e.clientY; last = null; try { el.setPointerCapture(e.pointerId); } catch {}
+    if (e.target.closest("button")) return;
+    pts.set(e.pointerId, local(e)); try { el.setPointerCapture(e.pointerId); } catch {}
+    if (pts.size === 2) return startPinch();
+    if (pts.size > 2 || pinch || ER.busy || !ER.ready) return;
+    on = true; painting = false; sx = e.clientX; sy = e.clientY; last = null;
     t = setTimeout(() => { if (on && !painting) { ER.before = true; drawEraser(); } }, 350);
   });
   el.addEventListener("pointermove", (e) => {
+    if (pts.has(e.pointerId)) pts.set(e.pointerId, local(e));
+    if (pinch) {
+      if (pts.size < 2) return;
+      const [a, b] = [...pts.values()], m = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+      const s = clamp((pinch.s * Math.hypot(a[0] - b[0], a[1] - b[1])) / pinch.d, 1, ZMAX), k = s / pinch.s;
+      return setZoom(s, m[0] - (pinch.m[0] - pinch.x) * k, m[1] - (pinch.m[1] - pinch.y) * k);
+    }
     if (!on || ER.before) return;
     if (!painting && Math.hypot(e.clientX - sx, e.clientY - sy) < 8) return;
     if (!painting) { painting = true; clearTimeout(t); ctx = snapshot(sel()); last = toMid({ clientX: sx, clientY: sy }); dab(null, last); }
     const pt = toMid(e); dab(last, pt); last = pt;
   });
   const up = (e, cancel) => {
+    pts.delete(e.pointerId);
+    if (pinch) { if (!pts.size) pinch = null; return; }
     if (!on) return; on = false; clearTimeout(t);
     if (ER.before) { ER.before = false; drawEraser(); return; }
     if (painting) { ER.any = true; drawEraser(); return; }
     if (cancel) return;
-    const r = el.getBoundingClientRect();
+    const r = photoRect();
     tapAt(clamp((e.clientX - r.left) / r.width, 0, 1), clamp((e.clientY - r.top) / r.height, 0, 1));
   };
   el.addEventListener("pointerup", (e) => up(e, false));
   el.addEventListener("pointercancel", (e) => up(e, true));
   el.addEventListener("contextmenu", (e) => e.preventDefault());
+  el.addEventListener("gesturestart", (e) => e.preventDefault()); // Safari: keep the page itself from zooming
+  el.addEventListener("wheel", (e) => { // trackpad: pinch (ctrl + wheel) zooms at the pointer, two-finger scroll pans
+    e.preventDefault(); const [mx, my] = local(e);
+    if (e.ctrlKey) { const s = clamp(Z.s * Math.exp(-e.deltaY / 100), 1, ZMAX), k = s / Z.s; setZoom(s, mx - (mx - Z.x) * k, my - (my - Z.y) * k); }
+    else setZoom(Z.s, Z.x - e.deltaX, Z.y - e.deltaY);
+  }, { passive: false });
 })();
+$("erFit").onclick = () => setZoom(1, 0, 0);
 $("erUndo").onclick = () => {
   const p = sel();
   if (ER.hist.length) { ER.sel = ER.hist.pop(); ER.any = !!(ER.sel && alphaBox(ER.sel, 4)); }
@@ -1055,6 +1104,27 @@ $("erUndo").onclick = () => {
 };
 $("erGo").onclick = removeSelected;
 $("erBrush").onclick = () => { ER.brush = (ER.brush + 1) % BRUSH.length; drawEraser(); toast(`Brush: ${BRUSH[ER.brush][0]}`, 1200); };
+
+/* ---------------- Remove -> Even out a set: the same photos, removals included, become (or join) that tool's set */
+async function toAlign() {
+  if (ER.busy) return toast("Wait for Remove to finish", 1800);
+  const src = S.photos.slice(); if (!src.length) return;
+  sets.remove = Object.fromEntries(SET.map((k) => [k, S[k]]));
+  Object.assign(S, sets.align || fresh(), { app: "align", editing: false, save: null, zoom: null });
+  const hadRef = !!S.refId; render();
+  for (let i = 0; i < src.length; i++) {
+    toast(`Finding the subject ${i + 1} of ${src.length}…`, 15000);
+    const p = src[i], c = document.createElement("canvas"); c.width = p.mid.c.width; c.height = p.mid.c.height; c.getContext("2d").drawImage(p.mid.c, 0, 0);
+    const mid = p.edits.length ? { c, s: p.mid.s } : p.mid0, sm = scaled(mid.c, mid.c.width, mid.c.height, DETECT);
+    if (!p.edits.length) c.width = 0;
+    const est = await detect(sm.c, 1 / (mid.s * sm.s)); sm.c.width = 0;
+    const q = { ...p, id: S.nextId++, mid, edits: p.edits.slice(), est, pick: null, manual: null };
+    S.photos.push(q); if (!S.refId) S.refId = q.id;
+  }
+  S.selId = S.photos[S.photos.length - 1].id; render();
+  toast(hadRef ? `${src.length} photo${src.length > 1 ? "s" : ""} added to your set` : S.photos.length > 1 ? "Photo 1 is the reference. Change it in ⋯." : "Now add the photos to fix", 4000);
+}
+$("optAlign").onclick = () => { $("menu").hidden = true; toAlign(); };
 
 /* ---------------- adding photos */
 $("emptyCta").onclick = () => { if (S.app === "remove") { loadEraser().catch(() => {}); return $("rmFile").click(); } (ref() ? $("moreFile") : $("refFile")).click(); };
@@ -1104,7 +1174,7 @@ function syncMenu() {
   $("fGroup").querySelectorAll(".opt").forEach((b) => b.setAttribute("aria-pressed", b.dataset.f === S.fmt));
   $("optGuides").setAttribute("aria-pressed", S.guides); $("optGuides").hidden = S.app !== "align";
   $("optRef").hidden = S.app !== "align" || !sel() || sel().id === S.refId || S.photos.length < 2;
-  $("optNew").hidden = !S.photos.length;
+  $("optNew").hidden = !S.photos.length; $("optAlign").hidden = S.app !== "remove" || !S.photos.length;
   $("optNew").firstElementChild.textContent = S.app === "align" ? "Start a new photo set" : "Start over";
 }
 $("moreBtn").onclick = () => { syncMenu(); $("menu").hidden = false; };
@@ -1177,7 +1247,8 @@ async function share(files) {
 }
 function saved(batch) {
   const n = targets().length, { from, to } = batch;
-  if (to >= n) { S.save = null; toast(from === 0 ? (n === 1 ? "Photo handed to iOS. Check Photos." : `All ${n} of ${n} photos handed to iOS. Check Photos.`) : `Photo${to - from > 1 ? "s" : ""} ${span(from + 1, n)} handed to iOS. All ${n} done.`, 4000); }
+  const next = S.app === "remove" && S.photos.length > 1 ? { label: "Even out", fn: toAlign } : undefined;
+  if (to >= n) { S.save = null; toast(from === 0 ? (n === 1 ? "Photo handed to iOS. Check Photos." : `All ${n} of ${n} photos handed to iOS. Check Photos.`) : `Photo${to - from > 1 ? "s" : ""} ${span(from + 1, n)} handed to iOS. All ${n} done.`, next ? 6000 : 4000, next); }
   else { S.save = { sig: signature(), next: to, files: null }; toast(`Photo${to - from > 1 ? "s" : ""} ${span(from + 1, to)} of ${n} handed to iOS. Tap Save for the rest.`, 5000); }
   syncSave();
 }

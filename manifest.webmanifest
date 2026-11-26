@@ -1,6 +1,6 @@
 {
-  "name": "Even Frames",
-  "short_name": "Even Frames",
+  "name": "bôngiu",
+  "short_name": "bôngiu",
   "description": "Match subject size and position across a photo set before posting.",
   "start_url": "./",
   "scope": "./",
