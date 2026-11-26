@@ -1,0 +1,10 @@
+{
+  "name": "bongiu",
+  "private": true,
+  "type": "module",
+  "description": "No build step: the site is served as is. These scripts are for development only.",
+  "scripts": {
+    "test": "node --test tests/",
+    "format": "npx --yes prettier@3 --write js tests style.css sw.js"
+  }
+}
