@@ -814,7 +814,7 @@ $("cancelBtn").onclick = () => { Object.assign(sel(), edSnap); S.editing = false
 /* ---------------- remove people and objects: select first (tap = MediaPipe Magic Touch, drag = brush), then Remove (MI-GAN fill) */
 // Each removal is stored as a patch in original pixel coordinates with a soft-edged alpha mask and the photo's measured grain.
 // Only the patch area is replaced; every other pixel of the photo stays untouched.
-let segmenter = null, inpaint = null, eraserLoading = null;
+let segmenter = null, inpaint = null, eraserLoading = null, warm = null;
 const ER_MAX = 1024, BRUSH = [["small", 8], ["medium", 16], ["large", 30]]; // brush radius in screen points
 function loadScript(src) { return new Promise((res, rej) => { const t = document.createElement("script"); t.src = src; t.onload = res; t.onerror = () => rej(new Error("Couldn't load " + src)); document.head.appendChild(t); }); }
 function loadEraser() {
@@ -827,6 +827,10 @@ function loadEraser() {
       vision.InteractiveSegmenter.createFromOptions(fileset, { baseOptions: { modelAssetPath: base + "magic_touch.tflite", delegate: "CPU" }, outputCategoryMask: false, outputConfidenceMasks: true }),
       ort.InferenceSession.create(base + "migan_pipeline_v2.onnx", { executionProviders: ["wasm"] }),
     ]);
+    // the first run compiles the model (several seconds in Safari): do it now, on a tiny image, while the user picks what to remove
+    const N = 64, im = new Uint8Array(3 * N * N).fill(128), keep = new Uint8Array(N * N).fill(255);
+    for (let y = 24; y < 40; y++) keep.fill(0, y * N + 24, y * N + 40);
+    warm = inpaint.run({ image: new ort.Tensor("uint8", im, [1, 3, N, N]), mask: new ort.Tensor("uint8", keep, [1, 1, N, N]) }).catch(() => {});
     keepOffline(["mp/ort.wasm.min.js", "mp/ort-wasm-simd.wasm", "mp/magic_touch.tflite", "mp/migan_pipeline_v2.onnx"]);
   })().catch((e) => { eraserLoading = null; throw e; }));
 }
@@ -1037,30 +1041,34 @@ function cleanFill(out, px, mm, w, h) {
   // that difference smoothly inward (a membrane), so sky stays sky-coloured and sand stays sand-coloured
   const G = Math.max(1, Math.ceil(long / 96)), gw = Math.ceil(w / G), gh = Math.ceil(h / G), m = gw * gh;
   const val = new Float32Array(m * 3), cnt = new Float32Array(m), inH = new Uint8Array(m);
+  const w2 = 2 * w;
   for (let y = 2; y < h - 2; y++) for (let x = 2; x < w - 2; x++) {
-    const i = y * w + x; if (!hole(i)) continue;
+    const i = y * w + x; if (mm[i * 4 + 3] <= 127) continue;
     const g = ((y / G) | 0) * gw + ((x / G) | 0); inH[g] = 1;
-    for (const j of [i - 2, i + 2, i - 2 * w, i + 2 * w]) if (!hole(j)) { for (let ch = 0; ch < 3; ch++) val[g * 3 + ch] += px[j * 4 + ch] - f[i * 4 + ch]; cnt[g]++; break; }
+    const j = mm[(i - 2) * 4 + 3] <= 127 ? i - 2 : mm[(i + 2) * 4 + 3] <= 127 ? i + 2 : mm[(i - w2) * 4 + 3] <= 127 ? i - w2 : mm[(i + w2) * 4 + 3] <= 127 ? i + w2 : -1;
+    if (j < 0) continue;
+    val[g * 3] += px[j * 4] - f[i * 4]; val[g * 3 + 1] += px[j * 4 + 1] - f[i * 4 + 1]; val[g * 3 + 2] += px[j * 4 + 2] - f[i * 4 + 2]; cnt[g]++;
   }
   const fixed = new Uint8Array(m);
   for (let g = 0; g < m; g++) if (cnt[g]) { fixed[g] = 1; for (let ch = 0; ch < 3; ch++) val[g * 3 + ch] = clamp(val[g * 3 + ch] / cnt[g], -40, 40); }
-  const nb = (g) => { const gx = g % gw, out = []; if (gx > 0) out.push(g - 1); if (gx < gw - 1) out.push(g + 1); if (g >= gw) out.push(g - gw); if (g < m - gw) out.push(g + gw); return out; };
-  for (let it = 0; it < 300; it++) for (let g = 0; g < m; g++) {
-    if (!inH[g] || fixed[g]) continue;
+  const NB = new Int32Array(m * 4).fill(-1); // neighbour cells, computed once
+  for (let g = 0; g < m; g++) { const gx = g % gw; if (gx > 0) NB[g * 4] = g - 1; if (gx < gw - 1) NB[g * 4 + 1] = g + 1; if (g >= gw) NB[g * 4 + 2] = g - gw; if (g < m - gw) NB[g * 4 + 3] = g + gw; }
+  const free = []; for (let g = 0; g < m; g++) if (inH[g] && !fixed[g]) free.push(g);
+  for (let it = 0; it < 300; it++) for (const g of free) {
     let a0 = 0, a1 = 0, a2 = 0, k = 0;
-    for (const q of nb(g)) if (inH[q]) { a0 += val[q * 3]; a1 += val[q * 3 + 1]; a2 += val[q * 3 + 2]; k++; }
+    for (let e = 0; e < 4; e++) { const q = NB[g * 4 + e]; if (q >= 0 && inH[q]) { a0 += val[q * 3]; a1 += val[q * 3 + 1]; a2 += val[q * 3 + 2]; k++; } }
     if (k) { val[g * 3] = a0 / k; val[g * 3 + 1] = a1 / k; val[g * 3 + 2] = a2 / k; }
   }
   for (let pass = 0; pass < 2; pass++) for (let g = 0; g < m; g++) { // cells outside the hole borrow a neighbour's value, so the smooth upscale does not pull edges to 0
     if (inH[g]) continue;
-    for (const q of nb(g)) if (inH[q]) { val[g * 3] = val[q * 3]; val[g * 3 + 1] = val[q * 3 + 1]; val[g * 3 + 2] = val[q * 3 + 2]; inH[g] = 2; break; }
+    for (let e = 0; e < 4; e++) { const q = NB[g * 4 + e]; if (q >= 0 && inH[q]) { val[g * 3] = val[q * 3]; val[g * 3 + 1] = val[q * 3 + 1]; val[g * 3 + 2] = val[q * 3 + 2]; inH[g] = 2; break; } }
   }
   const gc = document.createElement("canvas"); gc.width = gw; gc.height = gh; const gx = gc.getContext("2d"), gi = gx.createImageData(gw, gh);
   for (let g = 0; g < m; g++) { for (let ch = 0; ch < 3; ch++) gi.data[g * 4 + ch] = 128 + val[g * 3 + ch] * 3; gi.data[g * 4 + 3] = 255; }
   gx.putImageData(gi, 0, 0);
   const uc = document.createElement("canvas"); uc.width = w; uc.height = h; const ux = uc.getContext("2d"); ux.imageSmoothingQuality = "high"; ux.drawImage(gc, 0, 0, w, h);
   const off = ux.getImageData(0, 0, w, h).data;
-  for (let i = 0; i < n; i++) if (hole(i)) for (let ch = 0; ch < 3; ch++) f[i * 4 + ch] += (off[i * 4 + ch] - 128) / 3;
+  for (let i = 0; i < n; i++) if (mm[i * 4 + 3] > 127) { f[i * 4] += (off[i * 4] - 128) / 3; f[i * 4 + 1] += (off[i * 4 + 1] - 128) / 3; f[i * 4 + 2] += (off[i * 4 + 2] - 128) / 3; }
   gc.width = uc.width = 0;
   return f;
 }
@@ -1079,6 +1087,7 @@ async function fillArea(p, img, b) { // b: area in preview (mid) pixels
   const px = sx.getImageData(0, 0, sw, sh).data, mm = mx.getImageData(0, 0, sw, sh).data, n = sw * sh;
   const im = new Uint8Array(3 * n), keep = new Uint8Array(n);
   for (let i = 0; i < n; i++) { im[i] = px[i * 4]; im[n + i] = px[i * 4 + 1]; im[2 * n + i] = px[i * 4 + 2]; keep[i] = mm[i * 4 + 3] > 127 ? 0 : 255; }
+  await warm; // a session runs one job at a time
   const out = (await inpaint.run({ image: new ort.Tensor("uint8", im, [1, 3, sh, sw]), mask: new ort.Tensor("uint8", keep, [1, 1, sh, sw]) })).result.data;
   // soft edge outside the selection: the mask shrunk and grown again
   const f = Math.max(2, Math.round(Math.min(sw, sh) / 64)), sm = document.createElement("canvas");
