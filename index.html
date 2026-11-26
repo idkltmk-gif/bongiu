@@ -23,7 +23,7 @@
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 [hidden] { display: none !important; }
 html, body { margin: 0; height: 100%; overflow: hidden; overscroll-behavior: none; }
-body { background: #000; color: var(--fg); font: 15px/1.35 var(--font); -webkit-text-size-adjust: 100%; -webkit-user-select: none; user-select: none; }
+body { background: #000; color: var(--fg); font: 15px/1.35 var(--font); -webkit-text-size-adjust: 100%; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 button { font: inherit; color: inherit; border: 0; background: none; padding: 0; cursor: pointer; touch-action: manipulation; }
 button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 button:active { transform: scale(.96); transition: transform 80ms ease-out; }
@@ -64,7 +64,12 @@ button.tag svg { width: 14px; height: 14px; }
 .chip { position: absolute; bottom: 10px; height: 34px; padding: 0 13px; border-radius: 999px; font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; }
 .chip svg { width: 16px; height: 16px; }
 .adjust { left: 10px; }
-.fit { right: 10px; }
+#cGhost { opacity: 0; transition: opacity .15s ease-out; }
+.view.ghost #cGhost { opacity: .5; }
+.view.ghost #cAfter { clip-path: none !important; }
+.view.ghost .handle, .view.ghost #tagL { opacity: 0; }
+.handle, #tagL { transition: opacity .15s ease-out; }
+@media (prefers-reduced-motion: reduce) { #cGhost, .handle, #tagL { transition: none; } }
 .chip.warn { background: var(--warn); color: #000; box-shadow: none; }
 
 .empty { width: min(360px, calc(100% - 32px)); border-radius: 28px; padding: 26px 22px; display: grid; gap: 14px; text-align: center; }
@@ -111,7 +116,6 @@ button.tag svg { width: 14px; height: 14px; }
 .th .n { position: absolute; left: 4px; top: 4px; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 9px; background: rgba(0,0,0,.6); font-size: 11px; font-weight: 700; display: grid; place-items: center; }
 .th .lbl { position: absolute; left: 0; right: 0; bottom: 0; font-size: 9px; font-weight: 800; letter-spacing: .06em; text-align: center; padding: 2px 0; }
 .th .lbl.ref { background: rgba(10,132,255,.92); }
-.th .lbl.fill { background: var(--warn); color: #000; }
 .th .miss { position: absolute; right: 4px; top: 4px; width: 18px; height: 18px; border-radius: 50%; background: var(--warn); color: #000; font-size: 12px; font-weight: 800; display: grid; place-items: center; }
 .th .x { position: absolute; right: 2px; top: 2px; width: 24px; height: 24px; border-radius: 50%; background: rgba(0,0,0,.7); display: grid; place-items: center; }
 .th .x svg { width: 12px; height: 12px; stroke-width: 3; }
@@ -166,12 +170,12 @@ button.tag svg { width: 14px; height: 14px; }
     <div class="view" id="view" hidden>
       <canvas id="cBefore"></canvas>
       <canvas id="cAfter"></canvas>
+      <canvas id="cGhost"></canvas>
       <div class="guides" id="guides"></div>
       <button class="tag glass l" id="tagL" aria-label="Switch what this photo is compared with"><span>Reference</span><svg class="i" viewBox="0 0 24 24"><path d="M7 4l-3 3 3 3M4 7h13M17 20l3-3-3-3M20 17H7"/></svg></button>
       <span class="tag glass r" id="tagR">Fixed</span>
       <div class="handle" id="handle"><div class="knob"><svg viewBox="0 0 24 24"><path d="M9 6l-6 6 6 6M15 6l6 6-6 6"/></svg></div></div>
       <button class="chip adjust glass" id="adjustBtn"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="9" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg><span>Adjust subject</span></button>
-      <button class="chip fit warn" id="fitBtn" hidden>Zoom to fit</button>
     </div>
 
     <div class="editor" id="editor" hidden>
@@ -185,7 +189,7 @@ button.tag svg { width: 14px; height: 14px; }
     <div class="ratios" id="ratios" role="group" aria-label="Frame shape"></div>
     <div class="zoom" id="zoomRow">
       <button id="zoomOut" aria-label="Smaller subject">−</button>
-      <input type="range" id="zoom" min="0.5" max="3" step="0.01" value="1" aria-label="Subject size">
+      <input type="range" id="zoom" min="1" max="3" step="0.01" value="1" aria-label="Subject size. Far left matches the reference framing">
       <button id="zoomIn" aria-label="Bigger subject">+</button>
     </div>
     <div class="edit-row" id="editRow" hidden>
@@ -234,8 +238,10 @@ const RATIOS = [["orig", "Orig", 0], ["4:5", "4:5", 0.8], ["1:1", "1:1", 1], ["3
 const P3 = matchMedia("(color-gamut: p3)").matches;
 const store = { get: (k) => { try { return localStorage.getItem(k); } catch { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch {} } };
 
-// zoom: null = automatic (smallest zoom where no photo needs filled edges)
-const S = { photos: [], refId: null, selId: null, ratio: "4:5", zoom: null, cmp: "ref", quality: "best", fmt: "image/jpeg", guides: true, editing: false, lay: null, nextId: 1, ready: null, status: "Loading detection…" };
+// zoom: null = the reference's own framing (or the tightest zoom every photo allows)
+// save: progress of a batched save { sig, next, files } — dropped as soon as anything that changes the output changes
+const S = { photos: [], refId: null, selId: null, ratio: "4:5", zoom: null, cmp: "ref", quality: "best", fmt: "image/jpeg", guides: true, editing: false, lay: null, nextId: 1, save: null, status: "Loading detection…" };
+const BATCH_BYTES = 120e6;
 const ref = () => S.photos.find((p) => p.id === S.refId);
 const sel = () => S.photos.find((p) => p.id === S.selId);
 const idx = (p) => S.photos.indexOf(p);
@@ -293,16 +299,15 @@ async function makePhoto(file) {
   const W = img.naturalWidth, H = img.naturalHeight, small = scaled(img, W, H, DETECT), mid = scaled(img, W, H, MID);
   release(loaded); // keep only small copies in memory; the full photo is decoded again at save time
   const thumb = scaled(mid.c, mid.c.width, mid.c.height, 180).c.toDataURL("image/jpeg", 0.8);
-  const tiny = scaled(mid.c, mid.c.width, mid.c.height, 14).c, blur = document.createElement("canvas");
-  blur.width = tiny.width * 8; blur.height = tiny.height * 8;
-  const bx = blur.getContext("2d"); bx.imageSmoothingQuality = "high"; bx.drawImage(tiny, 0, 0, blur.width, blur.height);
-  const p = { id: S.nextId++, file, name: file.name.replace(/\.[^.]+$/, "") || "photo", W, H, mid, thumb, blur, date: await readDate(file), est: { faces: [], poses: [], objects: [] }, pick: 0, manual: null };
-  const k = 1 / small.s;
-  await ready;
+  // pick: null = automatic (same person as on the reference when the head count matches)
+  const p = { id: S.nextId++, file, name: file.name.replace(/\.[^.]+$/, "") || "photo", W, H, mid, thumb, date: await readDate(file), est: { faces: [], poses: [], objects: [] }, pick: null, manual: null };
+  const k = 1 / small.s, breathe = () => new Promise((r) => setTimeout(r, 0)); // let the screen update between models
+  await ready; await breathe();
   if (faceDet) {
     try {
       p.est.faces = big((faceDet.detect(small.c).detections || []).map(({ boundingBox: b }) => ({ cx: (b.originX + b.width / 2) * k, cy: (b.originY + b.height / 2) * k, h: b.height * k, kind: "head" })).sort((a, b) => b.h - a.h));
     } catch (e) { console.warn(e); }
+    await breathe();
   }
   if (poseDet) {
     try {
@@ -377,7 +382,14 @@ const dateMs = (dt) => { const m = dt.d.match(/(\d+):(\d+):(\d+) (\d+):(\d+):(\d
 
 /* ---------------- which subject each photo uses; one measuring rule per set */
 const cands = (p) => (p.est.faces.length ? p.est.faces : p.est.poses.length ? p.est.poses : p.est.objects);
-const pickIdx = (p) => clamp(p.pick, 0, Math.max(0, cands(p).length - 1));
+const leftToRight = (L) => L.map((_, i) => i).sort((a, b) => L[a].cx - L[b].cx);
+function pickIdx(p) { // same person as on the reference: same place in the left-to-right order when the head count matches
+  const L = cands(p); if (L.length < 2) return 0;
+  if (p.pick !== null) return clamp(p.pick, 0, L.length - 1);
+  const R = ref();
+  if (R && R !== p) { const RL = cands(R); if (RL.length === L.length) return leftToRight(L)[leftToRight(RL).indexOf(pickIdx(R))]; }
+  return 0;
+}
 const fOf = (p) => p.est.faces[pickIdx(p)] || null;
 function pOf(p) {
   const P = p.est.poses; if (!P.length) return null;
@@ -410,27 +422,22 @@ const missing = (p, md) => !p.manual && !auto(p, md);
 
 /* ---------------- layout: copy the reference's subject size and position */
 function aspect() { const r = RATIOS.find((x) => x[0] === S.ratio); return r[2] || ref().W / ref().H; }
-function maxCropH(p, s, a, tx, ty) {
-  const lim = [p.H, p.W / a];
-  if (tx > 0) lim.push(s.cx / (tx * a)); if (tx < 1) lim.push((p.W - s.cx) / ((1 - tx) * a));
-  if (ty > 0) lim.push(s.cy / ty); if (ty < 1) lim.push((p.H - s.cy) / (1 - ty));
-  return Math.max(1, Math.min(...lim));
-}
+// Size always matches exactly. Position matches too, unless the photo runs out of picture:
+// then that photo alone slides back inside (never blurred fill, never zooming the whole set for it).
 function layout() {
   const md = mode(), a = aspect(), R = ref(), r0 = subj(R, md);
   const ch0 = Math.min(R.H, R.W / a), cw0 = ch0 * a, x0 = (R.W - cw0) / 2, y0 = (R.H - ch0) / 2;
   const tx = clamp((r0.cx - x0) / cw0, 0.05, 0.95), ty = clamp((r0.cy - y0) / ch0, 0.05, 0.95);
-  const base = r0.h / ch0, subs = new Map(), needs = new Map();
-  let need = 0, limiter = -1;
-  S.photos.forEach((p, i) => { const s = subj(p, md), v = s.h / maxCropH(p, s, a, tx, ty); subs.set(p.id, s); needs.set(p.id, v); if (v > need) { need = v; limiter = i; } });
-  const fit = need / base, zoom = S.zoom ?? Math.max(1, fit), r = base * zoom, crops = new Map(), filled = [];
-  S.photos.forEach((p, i) => {
-    const s = subs.get(p.id), h = s.h / r, w = h * a, fill = needs.get(p.id) > r * 1.001;
-    let x = s.cx - tx * w, y = s.cy - ty * h;
-    if (fill) filled.push(i); else { x = clamp(x, 0, Math.max(0, p.W - w)); y = clamp(y, 0, Math.max(0, p.H - h)); }
-    crops.set(p.id, { x, y, w, h, fill });
+  const base = r0.h / ch0, subs = new Map();
+  let fit = 1, limiter = -1; // fit > 1 only when a subject is too big for its own photo at the reference size
+  S.photos.forEach((p, i) => { const s = subj(p, md), v = s.h / Math.min(p.H, p.W / a) / base; subs.set(p.id, s); if (v > fit * 1.001) { fit = v; limiter = i; } });
+  const zoom = Math.max(fit, S.zoom ?? fit), r = base * zoom, crops = new Map();
+  S.photos.forEach((p) => {
+    const s = subs.get(p.id), h = Math.min(p.H, s.h / r), w = Math.min(p.W, h * a), ix = s.cx - tx * w, iy = s.cy - ty * h;
+    const x = clamp(ix, 0, Math.max(0, p.W - w)), y = clamp(iy, 0, Math.max(0, p.H - h));
+    crops.set(p.id, { x, y, w, h, shift: Math.hypot((x - ix) / w, (y - iy) / h) });
   });
-  return { md, a, tx, ty, r, zoom, fit, crops, filled, limiter, autoZoomed: S.zoom === null && fit > 1.001 };
+  return { md, a, tx, ty, r, zoom, fit, crops, limiter };
 }
 
 /* ---------------- drawing (preview uses the 1600 px copy, save uses the original) */
@@ -439,31 +446,28 @@ function fitBox(a) {
   let w = W, h = w / a; if (h > H) { h = H; w = h * a; }
   return [Math.max(40, Math.floor(w)), Math.max(40, Math.floor(h))];
 }
-function cover(x, b, w, h) { const s = Math.max(w / b.width, h / b.height); x.drawImage(b, (w - b.width * s) / 2, (h - b.height * s) / 2, b.width * s, b.height * s); }
-function visible(p, c) { const x0 = Math.max(0, c.x), y0 = Math.max(0, c.y); return { x0, y0, w: Math.min(p.W, c.x + c.w) - x0, h: Math.min(p.H, c.y + c.h) - y0 }; }
 function paint(p, c, canvas, w, h) {
   const d = Math.min(2, devicePixelRatio || 1);
   canvas.width = Math.round(w * d); canvas.height = Math.round(h * d);
-  const x = canvas.getContext("2d"), k = canvas.width / c.w, s = p.mid.s, v = visible(p, c);
+  const x = canvas.getContext("2d"), s = p.mid.s;
   x.imageSmoothingQuality = "high";
-  if (c.fill) cover(x, p.blur, canvas.width, canvas.height);
-  x.drawImage(p.mid.c, v.x0 * s, v.y0 * s, v.w * s, v.h * s, (v.x0 - c.x) * k, (v.y0 - c.y) * k, v.w * k, v.h * k);
+  x.drawImage(p.mid.c, c.x * s, c.y * s, c.w * s, c.h * s, 0, 0, canvas.width, canvas.height);
 }
 const centerCrop = (p, a) => { const h = Math.min(p.H, p.W / a), w = h * a; return { x: (p.W - w) / 2, y: (p.H - h) / 2, w, h }; };
 let cmp = 0.5;
 function setCmp(v) { cmp = clamp(v, 0, 1); $("cAfter").style.clipPath = `inset(0 0 0 ${cmp * 100}%)`; $("handle").style.left = cmp * 100 + "%"; }
 
-function subText(p, lay) {
-  const c = lay.crops.get(p.id), parts = [], n = cands(p).length;
-  if (p.id === S.refId) parts.push(lay.autoZoomed ? `Zoomed in so photo ${lay.limiter + 1} fits` : "Other photos match this one");
-  if (c.fill) parts.push("edges filled with blur");
-  if (n > 1 && !p.manual) parts.push(`${n} ${cands(p)[0].kind === "object" ? "objects" : "people"} found`);
-  if (S.quality === "best" && c.w < IG) parts.push(`low res: ${Math.round(c.w)} px wide`);
-  return parts.join(" · ");
+function note(p, lay) { // one line, the most useful thing to know about this photo
+  const c = lay.crops.get(p.id), n = cands(p).length;
+  if (missing(p, lay.md)) return "No subject found. Tap Set subject.";
+  if (p.id === S.refId) return lay.limiter >= 0 && lay.zoom <= lay.fit * 1.001 ? `Zoomed in so photo ${lay.limiter + 1} fits` : "Other photos match this one";
+  if (c.shift > 0.02) return `Moved ${Math.round(c.shift * 100)}% to stay inside the photo`;
+  if (n > 1 && p.pick === null && !p.manual) return `${n} ${cands(p)[0].kind === "object" ? "objects" : "people"} found. Matching the reference.`;
+  if (S.quality === "best" && c.w < IG) return `Low resolution: ${Math.round(c.w)} px wide`;
+  return "";
 }
 function render() {
   const n = S.photos.length, R = ref(), ok = !!R && n > 1, p = sel();
-  S.ready = null; $("saveBtn").textContent = "Save";
   $("moreBtn").hidden = S.editing; $("cancelBtn").hidden = !S.editing;
   $("saveBtn").hidden = S.editing; $("doneBtn").hidden = !S.editing;
   $("saveBtn").disabled = !ok;
@@ -481,21 +485,30 @@ function render() {
   if (S.editing) { drawStrip(); return drawEditor(); }
   $("editor").hidden = true;
   $("view").hidden = !ok;
-  if (!ok) { S.lay = null; drawStrip(); return; }
+  if (!ok) { S.lay = null; drawStrip(); syncSave(); return; }
   drawRatios();
   stage();
+}
+// anything that changes the saved files restarts a batched save
+const span = (a, b) => (a === b ? `${a}` : `${a}–${b}`);
+const signature = () => JSON.stringify([S.ratio, S.lay?.zoom.toFixed(4), S.quality, S.fmt, S.refId, S.photos.map((p) => [p.id, p.pick, p.manual && [p.manual.cx, p.manual.cy, p.manual.h]])]);
+function syncSave() {
+  if (S.save && S.save.sig !== signature()) S.save = null;
+  const b = $("saveBtn"), n = S.photos.length;
+  b.textContent = !S.save ? "Save" : S.save.files ? "Tap to save" : `Save ${span(S.save.next + 1, n)}`;
 }
 function stage() {
   const lay = (S.lay = layout()), [w, h] = fitBox(lay.a), v = $("view"), p = sel(), isRef = p.id === S.refId;
   v.style.width = w + "px"; v.style.height = h + "px";
   paint(p, lay.crops.get(p.id), $("cAfter"), w, h);
   if (isRef) {
-    $("cAfter").style.clipPath = "none"; $("handle").hidden = $("tagL").hidden = $("cBefore").hidden = true;
+    $("cAfter").style.clipPath = "none"; $("handle").hidden = $("tagL").hidden = $("cBefore").hidden = $("cGhost").hidden = true;
     $("tagR").textContent = "Reference";
   } else {
-    const R = ref();
-    if (S.cmp === "ref") paint(R, lay.crops.get(R.id), $("cBefore"), w, h); else paint(p, centerCrop(p, lay.a), $("cBefore"), w, h);
-    $("handle").hidden = $("tagL").hidden = $("cBefore").hidden = false;
+    const R = ref(), rc = lay.crops.get(R.id);
+    paint(R, rc, $("cGhost"), w, h);
+    if (S.cmp === "ref") paint(R, rc, $("cBefore"), w, h); else paint(p, centerCrop(p, lay.a), $("cBefore"), w, h);
+    $("handle").hidden = $("tagL").hidden = $("cBefore").hidden = $("cGhost").hidden = false;
     $("tagL").firstElementChild.textContent = S.cmp === "ref" ? "Reference" : "Original";
     $("tagR").textContent = S.cmp === "ref" ? `Photo ${idx(p) + 1}` : "Fixed";
     setCmp(cmp);
@@ -508,27 +521,39 @@ function stage() {
   const miss = missing(p, lay.md), a = $("adjustBtn");
   a.classList.toggle("warn", miss); a.classList.toggle("glass", !miss);
   a.lastElementChild.textContent = miss ? "Set subject" : cands(p).length > 1 && !p.manual ? "Choose subject" : "Adjust subject";
-  $("fitBtn").hidden = !lay.filled.length;
-  $("zoom").value = clamp(lay.zoom, 0.5, 3);
-  sub(subText(p, lay));
+  const z = $("zoom"), zmax = Math.max(3, lay.fit * 1.5);
+  z.min = lay.fit; z.max = zmax; z.value = lay.zoom;
+  $("zoomOut").disabled = lay.zoom <= lay.fit * 1.001; $("zoomIn").disabled = lay.zoom >= zmax * 0.999;
+  sub(note(p, lay));
   drawStrip();
+  syncSave();
 }
 
-/* compare: horizontal drag moves the divider, vertical swipes pass through */
+/* compare: drag sideways to move the divider; touch and hold to lay the reference over this photo (like holding in Photos) */
 (() => {
-  const el = $("view"); let on = false, decided = false, sx = 0, sy = 0;
+  const el = $("view"); let on = false, decided = false, ghost = false, sx = 0, sy = 0, t = 0;
   const at = (e) => { const r = el.getBoundingClientRect(); setCmp((e.clientX - r.left) / r.width); };
-  el.addEventListener("pointerdown", (e) => { if (sel()?.id === S.refId || e.target.closest("button")) return; on = true; sx = e.clientX; sy = e.clientY; decided = e.pointerType !== "touch"; if (decided) { el.setPointerCapture(e.pointerId); at(e); } });
+  const setGhost = (v) => { ghost = v; el.classList.toggle("ghost", v); $("tagR").textContent = v ? "Reference on top" : S.cmp === "ref" ? `Photo ${idx(sel()) + 1}` : "Fixed"; };
+  const stop = () => { clearTimeout(t); on = false; if (ghost) setGhost(false); };
+  el.addEventListener("pointerdown", (e) => {
+    if (sel()?.id === S.refId || e.target.closest("button")) return;
+    on = true; decided = false; sx = e.clientX; sy = e.clientY;
+    if (e.pointerType !== "touch") el.setPointerCapture(e.pointerId);
+    t = setTimeout(() => { if (on && !decided) { setGhost(true); navigator.vibrate?.(8); } }, 260);
+  });
   el.addEventListener("pointermove", (e) => {
-    if (!on) return;
-    if (!decided) { const dx = Math.abs(e.clientX - sx), dy = Math.abs(e.clientY - sy); if (dx < 6 && dy < 6) return; if (dy > dx) { on = false; return; } decided = true; el.setPointerCapture(e.pointerId); }
+    if (!on || ghost) return;
+    if (!decided) {
+      const dx = Math.abs(e.clientX - sx), dy = Math.abs(e.clientY - sy); if (dx < 6 && dy < 6) return;
+      clearTimeout(t); if (dy > dx) { on = false; return; } decided = true; el.setPointerCapture(e.pointerId);
+    }
     at(e);
   });
-  el.addEventListener("pointerup", (e) => { if (on && !decided) at(e); on = false; });
-  el.addEventListener("pointercancel", () => (on = false));
+  el.addEventListener("pointerup", (e) => { if (on && !decided && !ghost) at(e); stop(); });
+  el.addEventListener("pointercancel", stop);
+  el.addEventListener("contextmenu", (e) => e.preventDefault());
 })();
 $("tagL").onclick = () => { S.cmp = S.cmp === "ref" ? "orig" : "ref"; stage(); };
-$("fitBtn").onclick = () => { S.zoom = null; stage(); };
 
 /* ---------------- ratios + zoom */
 function drawRatios() {
@@ -544,11 +569,11 @@ function drawRatios() {
   }
 }
 let raf = 0;
-const later = () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(() => { S.ready = null; $("saveBtn").textContent = "Save"; stage(); }); };
+const later = () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(stage); };
 const curZoom = () => S.lay?.zoom ?? 1;
 $("zoom").oninput = () => { S.zoom = +$("zoom").value; later(); };
-$("zoomOut").onclick = () => { S.zoom = clamp(curZoom() - 0.05, 0.5, 3); later(); };
-$("zoomIn").onclick = () => { S.zoom = clamp(curZoom() + 0.05, 0.5, 3); later(); };
+$("zoomOut").onclick = () => { S.zoom = curZoom() - 0.05; later(); }; // layout() never goes below the reference framing
+$("zoomIn").onclick = () => { S.zoom = Math.min(+$("zoom").max, curZoom() + 0.05); later(); };
 
 /* ---------------- strip: tap to view, × to remove (with undo), hold and drag to reorder */
 function drawStrip() {
@@ -558,8 +583,7 @@ function drawStrip() {
     b.setAttribute("role", "button"); b.tabIndex = 0; b.setAttribute("aria-label", (p.id === S.refId ? "Reference, " : "") + `photo ${i + 1}`);
     const im = document.createElement("img"); im.src = p.thumb; im.alt = ""; b.appendChild(im);
     const n = document.createElement("span"); n.className = "n"; n.textContent = i + 1; b.appendChild(n);
-    const fill = S.lay?.crops.get(p.id)?.fill;
-    if (p.id === S.refId || fill) { const r = document.createElement("span"); r.className = "lbl " + (p.id === S.refId ? "ref" : "fill"); r.textContent = p.id === S.refId ? "REF" : "FILL"; b.appendChild(r); }
+    if (p.id === S.refId) { const r = document.createElement("span"); r.className = "lbl ref"; r.textContent = "REF"; b.appendChild(r); }
     const isSel = p.id === S.selId && p.id !== S.refId && !S.editing;
     if (missing(p, md) && !isSel) { const m = document.createElement("span"); m.className = "miss"; m.textContent = "!"; b.appendChild(m); }
     if (isSel) {
@@ -681,8 +705,8 @@ $("moreFile").onchange = async (e) => {
   const md = mode(), miss = S.photos.filter((p) => p.id !== S.refId && missing(p, md)).length, multi = S.photos.filter((p) => cands(p).length > 1).length;
   toast(missing(ref(), md) ? "Set the subject on the reference first (photo 1)." :
     miss ? `${miss} photo${miss > 1 ? "s" : ""} marked ! need the subject placed by hand.` :
-    multi ? `${multi} photo${multi > 1 ? "s have" : " has"} several people. Tap Choose subject to switch.` :
-    "Photos added. Drag across a photo to compare with the reference.", 3600);
+      multi ? `${multi} photo${multi > 1 ? "s have" : " has"} several people. Tap Choose subject to switch.` :
+    "Drag across to compare. Touch and hold to lay the reference on top.", 4200);
   render();
 };
 
@@ -699,14 +723,14 @@ $("moreBtn").onclick = () => { syncMenu(); $("menu").hidden = false; };
 $("menuClose").onclick = () => ($("menu").hidden = true);
 $("menu").onclick = (e) => { if (e.target === $("menu")) $("menu").hidden = true; };
 $("qGroup").querySelectorAll(".opt").forEach((b) => (b.onclick = () => { S.quality = b.dataset.q; syncMenu(); if (S.lay) stage(); }));
-$("fGroup").querySelectorAll(".opt").forEach((b) => (b.onclick = () => { S.fmt = b.dataset.f; syncMenu(); S.ready = null; $("saveBtn").textContent = "Save"; }));
+$("fGroup").querySelectorAll(".opt").forEach((b) => (b.onclick = () => { S.fmt = b.dataset.f; syncMenu(); syncSave(); }));
 $("optGuides").onclick = () => { S.guides = !S.guides; syncMenu(); if (S.lay) stage(); };
 $("optRef").onclick = () => { S.refId = S.selId; S.zoom = null; $("menu").hidden = true; toast("This photo is now the reference"); render(); };
 let armed = 0;
 $("optNew").onclick = () => {
   const b = $("optNew");
   if (Date.now() - armed > 3000) { armed = Date.now(); b.firstElementChild.textContent = "Tap again to remove all photos"; return; }
-  Object.assign(S, { photos: [], refId: null, selId: null, zoom: null, editing: false, ready: null, lay: null });
+  Object.assign(S, { photos: [], refId: null, selId: null, zoom: null, editing: false, save: null, lay: null });
   $("menu").hidden = true; render();
 };
 addEventListener("resize", () => { if (S.editing) drawEditor(); else if (S.lay && !$("view").hidden) stage(); });
@@ -727,54 +751,59 @@ function drawDown(x, src, sx, sy, sw, sh, dx, dy, dw, dh) { // halve step by ste
   if (tmp) tmp.width = 0;
 }
 async function exportCanvas(p, crop) {
-  let c = { x: Math.round(crop.x), y: Math.round(crop.y), w: Math.round(crop.w), h: Math.round(crop.h), fill: crop.fill };
-  if (!c.fill) { c.w = Math.min(p.W, c.w); c.h = Math.min(p.H, c.h); c.x = clamp(c.x, 0, p.W - c.w); c.y = clamp(c.y, 0, p.H - c.h); }
+  const c = { w: Math.min(p.W, Math.round(crop.w)), h: Math.min(p.H, Math.round(crop.h)) };
+  c.x = clamp(Math.round(crop.x), 0, p.W - c.w); c.y = clamp(Math.round(crop.y), 0, p.H - c.h);
   let w = S.quality === "ig" ? IG : c.w, h = Math.round((w * c.h) / c.w);
   if (w * h > MAX_AREA) { const k = Math.sqrt(MAX_AREA / (w * h)); w = Math.floor(w * k); h = Math.floor(h * k); }
   const loaded = await loadImg(p.file);
   try {
-    if (loaded.img.naturalWidth !== p.W || loaded.img.naturalHeight !== p.H) throw new Error(`Photo ${idx(p) + 1} changed size while loading`);
-    const out = render2d(w, h), k = w / c.w, v = visible(p, c);
-    if (c.fill) cover(out.x, p.blur, w, h);
-    drawDown(out.x, loaded.img, v.x0, v.y0, v.w, v.h, Math.round((v.x0 - c.x) * k), Math.round((v.y0 - c.y) * k), Math.round(v.w * k), Math.round(v.h * k));
+    if (loaded.img.naturalWidth !== p.W || loaded.img.naturalHeight !== p.H) throw new Error(`Photo ${idx(p) + 1} could not be read again`);
+    const out = render2d(w, h); drawDown(out.x, loaded.img, c.x, c.y, c.w, c.h, 0, 0, w, h);
     return out.c;
   } finally { release(loaded); }
 }
-async function buildFiles() {
-  const lay = layout(), files = [], ext = S.fmt === "image/png" ? "png" : "jpg", q = 0.95, n = S.photos.length;
-  for (let i = 0; i < n; i++) {
+// Builds photos from `from` until about BATCH_BYTES, so a big set never sits in memory at once.
+async function buildBatch(from) {
+  const lay = layout(), files = [], ext = S.fmt === "image/png" ? "png" : "jpg", n = S.photos.length;
+  let bytes = 0, i = from;
+  for (; i < n && (files.length === 0 || bytes < BATCH_BYTES); i++) {
     $("saveBtn").textContent = `${i + 1}/${n}`;
     await new Promise((r) => setTimeout(r, 16));
     const p = S.photos[i], c = await exportCanvas(p, lay.crops.get(p.id));
-    let blob = await new Promise((r) => c.toBlob(r, S.fmt, S.fmt === "image/png" ? undefined : q));
+    let blob = await new Promise((r) => c.toBlob(r, S.fmt, S.fmt === "image/png" ? undefined : 0.95));
     c.width = 0;
-    if (!blob || !blob.size) throw new Error(`Photo ${i + 1} could not be made. Try Instagram size.`);
+    if (!blob || !blob.size) throw new Error(`Photo ${i + 1} could not be made. Try Instagram size in ⋯.`);
     if (S.fmt === "image/jpeg" && p.date) blob = await withExif(blob, p.date);
+    bytes += blob.size;
     files.push(new File([blob], `${String(i + 1).padStart(2, "0")}_${p.name}.${ext}`, { type: S.fmt, lastModified: p.date ? dateMs(p.date) : Date.now() }));
   }
-  if (files.length !== n) throw new Error(`Only ${files.length} of ${n} photos were made.`);
-  return files;
+  return { files, from, to: i };
 }
 async function share(files) {
-  const n = files.length;
-  if (navigator.canShare?.({ files })) { await navigator.share({ files }); toast(`All ${n} of ${n} photos handed to iOS. Check Photos.`, 3600); return; }
+  if (navigator.canShare?.({ files })) return navigator.share({ files });
   for (const f of files) { const a = document.createElement("a"); a.href = URL.createObjectURL(f); a.download = f.name; a.click(); await new Promise((r) => setTimeout(r, 300)); }
-  toast(`Downloaded ${n} of ${n} photos`, 3600);
+}
+function saved(batch) {
+  const n = S.photos.length, { from, to } = batch;
+  if (to >= n) { S.save = null; toast(from === 0 ? `All ${n} of ${n} photos handed to iOS. Check Photos.` : `Photo${to - from > 1 ? "s" : ""} ${span(from + 1, n)} handed to iOS. All ${n} done.`, 4000); }
+  else { S.save = { sig: signature(), next: to, files: null }; toast(`Photo${to - from > 1 ? "s" : ""} ${span(from + 1, to)} of ${n} handed to iOS. Tap Save for the rest.`, 5000); }
+  syncSave();
 }
 $("saveBtn").onclick = async () => {
   const b = $("saveBtn");
+  if (S.save && S.save.sig !== signature()) S.save = null;
   try {
-    if (S.ready) { const f = S.ready; await share(f); S.ready = null; b.textContent = "Save"; return; }
+    if (S.save?.files) { const batch = S.save.files; await share(batch.files); return saved(batch); }
     b.disabled = true;
-    const files = await buildFiles();
+    const batch = await buildBatch(S.save?.next ?? 0);
     b.disabled = false;
-    try { await share(files); b.textContent = "Save"; }
+    try { await share(batch.files); saved(batch); }
     catch (e) {
-      if (e.name === "AbortError") { b.textContent = "Save"; toast("Not saved"); return; }
+      if (e.name === "AbortError") { syncSave(); toast("Not saved"); return; }
       // Safari can drop the tap permission while photos are prepared: keep them and ask for one more tap
-      S.ready = files; b.textContent = "Tap to save"; toast(`${files.length} photos ready. Tap “Tap to save”.`, 4000);
+      S.save = { sig: signature(), next: batch.from, files: batch }; syncSave(); toast(`${batch.files.length} photos ready. Tap “Tap to save”.`, 4000);
     }
-  } catch (e) { console.warn(e); b.disabled = false; b.textContent = "Save"; if (e.name !== "AbortError") toast(e.message || "Couldn't save. Try Instagram size in ⋯.", 4000); }
+  } catch (e) { console.warn(e); b.disabled = false; syncSave(); if (e.name === "AbortError") toast("Not saved"); else toast(e.message || "Couldn't save. Try Instagram size in ⋯.", 4000); }
 };
 render();
 </script>
