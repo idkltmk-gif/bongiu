@@ -206,6 +206,9 @@ svg.i {
 .tool .ic.red {
   background: var(--danger);
 }
+.tool .ic.look {
+  background: linear-gradient(135deg, #ff9f0a, #bf5af2);
+}
 .tool strong {
   display: block;
   font-size: 17px;
@@ -639,6 +642,24 @@ button.tag svg {
   color: var(--fg2);
   font-size: 22px;
 }
+.look-row {
+  grid-row: 1 / span 2;
+  display: grid;
+  align-content: center;
+  gap: 2px;
+}
+.look-row .lk-top {
+  display: flex;
+  justify-content: space-between;
+  padding: 0 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg2);
+}
+.look-row output {
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+}
 .edit-row {
   grid-row: 1 / span 2;
   display: flex;
@@ -694,6 +715,7 @@ button.tag svg {
   inset: 0;
   border-radius: 13px;
   box-shadow: inset 0 0 0 2.5px #fff;
+  pointer-events: none; /* the ring sits on top of the thumbnail and must not swallow taps on × */
 }
 .th.lift {
   transform: scale(1.08);
@@ -757,7 +779,9 @@ button.tag svg {
   display: grid;
   place-items: center;
 }
-.th .x {
+.th .x,
+.th .swap {
+  z-index: 1;
   position: absolute;
   right: 2px;
   top: 2px;
@@ -768,7 +792,11 @@ button.tag svg {
   display: grid;
   place-items: center;
 }
-.th .x svg {
+.th .swap {
+  background: rgba(10, 132, 255, 0.95);
+}
+.th .x svg,
+.th .swap svg {
   width: 12px;
   height: 12px;
   stroke-width: 3;
@@ -913,4 +941,10 @@ button.tag svg {
     width: 44px;
     height: 56px;
   }
+}
+button.tag.fixed {
+  pointer-events: none;
+}
+button.tag.fixed svg {
+  display: none;
 }

@@ -1,5 +1,5 @@
-// bôngiu🤍 app: the two tools (Even out a set, Remove people & objects), their screens, gestures and saving.
-// Framing math is in frame.js, date-taken EXIF in exif.js; both are pure and tested in tests/.
+// bôngiu🤍 app: the three tools (Even out a set, Copy the look, Remove people & objects), their screens, gestures and saving.
+// Framing math is in frame.js, colour grade copy in look.js, date-taken EXIF in exif.js; all pure and tested in tests/.
 import {
   clamp,
   RATIOS,
@@ -15,6 +15,7 @@ import {
   centerCrop,
 } from "./frame.js";
 import { readDate, withExif, dateMs } from "./exif.js";
+import { measure, buildLut, applyLut } from "./look.js";
 
 const $ = (id) => document.getElementById(id);
 const DETECT = 768,
@@ -38,7 +39,8 @@ const store = {
 
 // zoom: null = the reference's own framing (or the tightest zoom every photo allows)
 // save: progress of a batched save { sig, next, files } — dropped as soon as anything that changes the output changes
-// app: null = home, "align" = Even out a set, "remove" = Remove people & objects. Each tool keeps its own photos (sets).
+// app: null = home, "align" = Even out a set, "look" = Copy the look, "remove" = Remove people & objects.
+// look: strength of Copy the look, 0–1.5 (1 = as measured), shared by every photo. Each tool keeps its own photos (sets).
 const state = {
   app: null,
   photos: [],
@@ -55,6 +57,7 @@ const state = {
   nextId: 1,
   save: null,
   status: "Loading detection…",
+  look: 1,
 };
 const BATCH_BYTES = 120e6;
 const SET = ["photos", "refId", "selId", "zoom", "save", "lay"],
@@ -364,7 +367,11 @@ function render() {
     for (const id of ["empty", "view", "eraser", "editor", "controls", "stripWrap"]) $(id).hidden = true;
     return;
   }
+  $("lookRow").hidden = true;
+  $("adjustBtn").hidden = app !== "align";
   if (app === "remove") return renderRemove();
+  if (app === "look") return renderLook();
+  steps("Pick the reference: the photo you like most", "Add the photos to fix", "Choose a frame, then Save");
   $("saveBtn").disabled = !ok;
   $("title").textContent = state.editing
     ? "Adjust subject"
@@ -405,6 +412,128 @@ function render() {
   drawRatios();
   stage();
 }
+function steps(...t) {
+  t.forEach((x, i) => ($(`st${i + 1}`).lastElementChild.textContent = x));
+}
+// Copy the look: same set-up as Even out a set (a reference, then the photos to change), no framing
+function renderLook() {
+  const n = state.photos.length,
+    R = ref(),
+    ok = !!R && n > 1,
+    p = sel();
+  $("saveBtn").disabled = !ok;
+  $("title").textContent =
+    ok && p ? (p.id === state.refId ? "Reference" : `Photo ${idx(p) + 1} of ${n}`) : "Copy the look";
+  $("empty").hidden = ok;
+  $("steps").hidden = false;
+  steps("Pick the reference: the photo whose colours you love", "Add the photos to change", "Set the strength, then Save");
+  $("st1").className = R ? "done" : "";
+  $("st2").className = n > 1 ? "done" : "";
+  $("emptyH").textContent = R ? "Now add the photos to change" : "Copy a photo's look";
+  $("emptyP").textContent = R
+    ? "They take the colours and tones of your reference. What's in them stays the same."
+    : "Pick a photo whose colours you love: a film shot, a friend's photo, a screenshot.";
+  $("emptyCta").textContent = R ? "Add photos" : "Choose reference photo";
+  $("emptyFine").textContent = "Photos stay on this device.";
+  $("controls").hidden = !ok;
+  $("stripWrap").hidden = !R;
+  $("stripHint").hidden = true;
+  $("ratios").hidden = $("zoomRow").hidden = $("editRow").hidden = $("eraseRow").hidden = true;
+  $("lookRow").hidden = false;
+  $("editor").hidden = $("eraser").hidden = true;
+  $("view").hidden = !ok;
+  state.lay = null;
+  if (!ok) {
+    sub("");
+    drawStrip();
+    syncSave();
+    return;
+  }
+  stageLook();
+}
+const lookOf = (p) => {
+  if (!p.look) {
+    const c = p.mid.c;
+    p.look = measure(c.getContext("2d").getImageData(0, 0, c.width, c.height).data, c.width, c.height);
+  }
+  return p.look;
+};
+let lutKey = "",
+  lutVal = null;
+function lutFor(p) {
+  const R = ref(),
+    key = `${p.id}:${R.id}:${state.look}`;
+  if (key !== lutKey) {
+    lutVal = buildLut(lookOf(p), lookOf(R), state.look);
+    lutKey = key;
+  }
+  return lutVal;
+}
+// grades a canvas in place, a band of rows at a time so a 12 MP photo never needs a second full copy
+function gradeCanvas(c, lut) {
+  const x = c.getContext("2d"),
+    band = Math.max(1, Math.floor(2_000_000 / c.width));
+  for (let y = 0; y < c.height; y += band) {
+    const h = Math.min(band, c.height - y),
+      d = x.getImageData(0, y, c.width, h);
+    applyLut(d.data, lut);
+    x.putImageData(d, 0, y);
+  }
+}
+// the reference, shown whole on top of this photo while held (it can have another shape)
+function paintContain(p, canvas, w, h) {
+  const d = Math.min(2, devicePixelRatio || 1);
+  canvas.width = Math.round(w * d);
+  canvas.height = Math.round(h * d);
+  const x = canvas.getContext("2d"),
+    k = Math.min(canvas.width / p.W, canvas.height / p.H),
+    dw = p.W * k,
+    dh = p.H * k;
+  x.fillStyle = "#000";
+  x.fillRect(0, 0, canvas.width, canvas.height);
+  x.imageSmoothingQuality = "high";
+  x.drawImage(p.mid.c, (canvas.width - dw) / 2, (canvas.height - dh) / 2, dw, dh);
+}
+function stageLook() {
+  const p = sel(),
+    R = ref(),
+    full = { x: 0, y: 0, w: p.W, h: p.H },
+    [w, h] = fitBox(p.W / p.H),
+    v = $("view");
+  v.style.width = w + "px";
+  v.style.height = h + "px";
+  $("guides").innerHTML = "";
+  paint(p, full, $("cAfter"), w, h);
+  if (p.id === state.refId) {
+    $("cAfter").style.clipPath = "none";
+    $("handle").hidden = $("tagL").hidden = $("cBefore").hidden = $("cGhost").hidden = true;
+    $("tagR").textContent = "Reference";
+    sub("Other photos take this photo's look");
+  } else {
+    gradeCanvas($("cAfter"), lutFor(p));
+    paint(p, full, $("cBefore"), w, h);
+    paintContain(R, $("cGhost"), w, h);
+    $("handle").hidden = $("tagL").hidden = $("cBefore").hidden = $("cGhost").hidden = false;
+    $("tagL").firstElementChild.textContent = "Original";
+    $("tagR").textContent = "New look";
+    setCmp(cmp);
+    sub("Drag across to compare. Hold to see the reference.");
+  }
+  $("tagL").classList.toggle("fixed", true);
+  drawStrip();
+  syncSave();
+}
+let lookRaf = 0;
+function setLook(v) {
+  state.look = clamp(Math.round(v) / 100, 0, 1.5);
+  $("lookAmt").value = Math.round(state.look * 100);
+  $("lookVal").textContent = `${Math.round(state.look * 100)}%`;
+  cancelAnimationFrame(lookRaf);
+  lookRaf = requestAnimationFrame(() => state.app === "look" && sel() && !$("view").hidden && stageLook());
+}
+$("lookAmt").oninput = () => setLook(+$("lookAmt").value);
+$("lookLess").onclick = () => setLook(state.look * 100 - 10);
+$("lookMore").onclick = () => setLook(state.look * 100 + 10);
 // Remove: the photo under the brush fills the screen; the strip switches photos; removals stay until undone
 function renderRemove() {
   const n = state.photos.length,
@@ -436,8 +565,13 @@ function renderRemove() {
   rm.ready = !!inpaint;
   drawEraser();
 }
-const targets = () => (state.app === "remove" ? state.photos.filter((p) => p.edits.length) : state.photos);
-const cropOf = (p, lay) => (state.app === "remove" ? { x: 0, y: 0, w: p.W, h: p.H } : lay.crops.get(p.id));
+const targets = () =>
+  state.app === "remove"
+    ? state.photos.filter((p) => p.edits.length)
+    : state.app === "look"
+      ? state.photos.filter((p) => p.id !== state.refId)
+      : state.photos;
+const cropOf = (p, lay) => (state.app !== "align" ? { x: 0, y: 0, w: p.W, h: p.H } : lay.crops.get(p.id));
 // anything that changes the saved files restarts a batched save
 const span = (a, b) => (a === b ? `${a}` : `${a}–${b}`);
 const signature = () =>
@@ -447,6 +581,7 @@ const signature = () =>
     state.quality,
     state.fmt,
     state.refId,
+    state.app === "look" && state.look,
     state.photos.map((p) => [p.id, p.pick, p.edits.length, p.manual && [p.manual.cx, p.manual.cy, p.manual.h]]),
   ]);
 function syncSave() {
@@ -470,6 +605,7 @@ function stage() {
     isRef = p.id === state.refId;
   v.style.width = w + "px";
   v.style.height = h + "px";
+  $("tagL").classList.remove("fixed");
   paint(p, lay.crops.get(p.id), $("cAfter"), w, h);
   if (isRef) {
     $("cAfter").style.clipPath = "none";
@@ -543,7 +679,13 @@ function stage() {
   const setGhost = (v) => {
     ghost = v;
     el.classList.toggle("ghost", v);
-    $("tagR").textContent = v ? "Reference on top" : state.cmp === "ref" ? `Photo ${idx(sel()) + 1}` : "Fixed";
+    $("tagR").textContent = v
+      ? "Reference on top"
+      : state.app === "look"
+        ? "New look"
+        : state.cmp === "ref"
+          ? `Photo ${idx(sel()) + 1}`
+          : "Fixed";
   };
   const stop = () => {
     clearTimeout(t);
@@ -588,6 +730,7 @@ function stage() {
   el.addEventListener("contextmenu", (e) => e.preventDefault());
 })();
 $("tagL").onclick = () => {
+  if (state.app !== "align") return;
   state.cmp = state.cmp === "ref" ? "orig" : "ref";
   stage();
 };
@@ -686,7 +829,19 @@ function drawStrip() {
       b.appendChild(m);
       b.setAttribute("aria-label", b.getAttribute("aria-label") + ", has a note");
     }
-    if (isSel) {
+    if (p.id === state.refId && state.app !== "remove" && !state.editing) {
+      // one tap on the reference's thumbnail icon picks a new reference
+      // (Copy the look replaces the old one; in Even out a set the old one stays as a photo of the set)
+      const sw = document.createElement("button");
+      sw.className = "swap";
+      sw.setAttribute("aria-label", "Change reference");
+      sw.innerHTML = `<svg class="i" viewBox="0 0 24 24"><path d="M4 9a8 8 0 0 1 14-3l2 2M20 4v4h-4M20 15a8 8 0 0 1-14 3l-2-2M4 20v-4h4"/></svg>`;
+      sw.onclick = (e) => {
+        e.stopPropagation();
+        if (!rm.busy) $("refFile").click();
+      };
+      b.appendChild(sw);
+    } else if (isSel) {
       const x = document.createElement("button");
       x.className = "x";
       x.setAttribute("aria-label", `Remove photo ${i + 1}`);
@@ -705,13 +860,14 @@ function drawStrip() {
     };
     s.appendChild(b);
   });
-  if ((al ? state.refId : state.photos.length) && !state.editing) {
+  const needRef = state.app !== "remove";
+  if ((needRef ? state.refId : state.photos.length) && !state.editing) {
     const add = document.createElement("button");
     add.className = "th add";
     add.setAttribute("aria-label", al ? "Add photos to fix" : "Add photos");
     add.innerHTML = `<svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>`;
     add.onclick = () => {
-      if (!rm.busy) $(al ? "moreFile" : "rmFile").click();
+      if (!rm.busy) $(needRef ? "moreFile" : "rmFile").click();
     };
     s.appendChild(add);
   }
@@ -741,7 +897,7 @@ function removePhoto(p) {
     moved = false;
   const start = (x, y, target) => {
     item = target.closest(".th:not(.add)");
-    if (!item || target.closest(".x") || state.editing || rm.busy) {
+    if (!item || target.closest(".x, .swap") || state.editing || rm.busy) {
       item = null;
       return;
     }
@@ -1905,6 +2061,10 @@ $("emptyCta").onclick = () => {
 };
 $("goAlign").onclick = () => enter("align");
 $("goRemove").onclick = () => enter("remove");
+$("goLook").onclick = () => {
+  enter("look");
+  setLook(state.look * 100);
+};
 $("backBtn").onclick = goHome;
 $("rmFile").onchange = async (e) => {
   const files = [...e.target.files];
@@ -1933,13 +2093,22 @@ $("refFile").onchange = async (e) => {
   if (!f) return;
   toast("Reading photo…", 15000);
   try {
-    const p = await makePhoto(f);
+    const look = state.app === "look",
+      p = await makePhoto(f, !look),
+      old = look ? ref() : null,
+      keep = old && sel() && sel().id !== old.id ? sel().id : null;
+    // Copy the look: a new reference replaces the old one (it is never saved), the photo on screen stays on screen
+    if (old) state.photos.splice(idx(old), 1);
     state.photos.unshift(p);
     state.refId = p.id;
-    state.selId = p.id;
+    state.selId = keep ?? p.id;
     state.zoom = null;
     toast(
-      missing(state, p)
+      look
+        ? old
+          ? "Reference changed"
+          : "Reference set"
+        : missing(state, p)
         ? "No subject found. You can place it by hand."
         : cands(p).length > 1
           ? `${cands(p).length} people found. Using the largest.`
@@ -1958,7 +2127,7 @@ $("moreFile").onchange = async (e) => {
   for (let i = 0; i < files.length; i++) {
     toast(`Reading ${i + 1} of ${files.length}…`, 15000);
     try {
-      last = await makePhoto(files[i]);
+      last = await makePhoto(files[i], state.app === "align");
       state.photos.push(last);
     } catch (err) {
       toast(err.message);
@@ -1966,6 +2135,11 @@ $("moreFile").onchange = async (e) => {
   }
   if (last) state.selId = last.id;
   state.zoom = null;
+  if (state.app === "look") {
+    toast("Drag across to compare. Hold to see the reference.", 4200);
+    render();
+    return warnIfBig();
+  }
   const md = mode(state),
     miss = state.photos.filter((p) => p.id !== state.refId && missing(state, p, md)).length,
     multi = state.photos.filter((p) => cands(p).length > 1).length;
@@ -1992,10 +2166,10 @@ function syncMenu() {
     .forEach((b) => b.setAttribute("aria-pressed", b.dataset.f === state.fmt));
   $("optGuides").setAttribute("aria-pressed", state.guides);
   $("optGuides").hidden = state.app !== "align";
-  $("optRef").hidden = state.app !== "align" || !sel() || sel().id === state.refId || state.photos.length < 2;
+  $("optRef").hidden = state.app === "remove" || !sel() || sel().id === state.refId || state.photos.length < 2;
   $("optNew").hidden = !state.photos.length;
   $("optAlign").hidden = state.app !== "remove" || !state.photos.length;
-  $("optNew").firstElementChild.textContent = state.app === "align" ? "Start a new photo set" : "Start over";
+  $("optNew").firstElementChild.textContent = state.app !== "remove" ? "Start a new photo set" : "Start over";
 }
 $("moreBtn").onclick = () => {
   syncMenu();
@@ -2056,6 +2230,7 @@ $("optNew").onclick = () => {
 addEventListener("resize", () => {
   if (state.app === "remove" && sel()) drawEraser();
   else if (state.editing) drawEditor();
+  else if (state.app === "look" && sel() && !$("view").hidden) stageLook();
   else if (state.lay && !$("view").hidden) stage();
 });
 
@@ -2131,6 +2306,7 @@ async function exportCanvas(p, crop) {
     drawDown(out.x, loaded.img, c.x, c.y, c.w, c.h, 0, 0, w, h);
     drawEdits(out.x, p, c.x, c.y, w / c.w); // removals go only where they were made; every other pixel is the original
     if (p.edits.length) addGrain(out.x, p, c.x, c.y, w / c.w);
+    if (state.app === "look") gradeCanvas(out.c, lutFor(p));
     return out.c;
   } finally {
     release(loaded);
@@ -2155,7 +2331,10 @@ async function buildBatch(from) {
     if (!blob || !blob.size) throw new Error(`Photo ${i + 1} could not be made. Try Instagram size in ⋯.`);
     if (state.fmt === "image/jpeg" && p.date) blob = await withExif(blob, p.date);
     bytes += blob.size;
-    const name = state.app === "align" ? `${String(i + 1).padStart(2, "0")}_${p.name}` : `${p.name}_edited`;
+    const name =
+      state.app === "align"
+        ? `${String(i + 1).padStart(2, "0")}_${p.name}`
+        : `${p.name}_${state.app === "look" ? "look" : "edited"}`;
     files.push(
       new File([blob], `${name}.${ext}`, { type: state.fmt, lastModified: p.date ? dateMs(p.date) : Date.now() }),
     );

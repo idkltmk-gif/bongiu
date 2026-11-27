@@ -30,10 +30,15 @@
     <div class="home" id="home">
       <img class="home-icon" src="icon-192.png" alt="" width="64" height="64">
       <h1>bôngiu🤍</h1>
-      <p class="tagline">Two quick photo fixes. Nothing leaves your phone.</p>
+      <p class="tagline">Three quick photo fixes. Nothing leaves your phone.</p>
       <button class="tool glass" id="goAlign">
         <span class="ic"><svg class="i" viewBox="0 0 24 24"><rect x="2.5" y="4" width="8.5" height="16" rx="2"/><rect x="13" y="4" width="8.5" height="16" rx="2"/><circle cx="6.75" cy="10" r="2"/><circle cx="17.25" cy="10" r="2"/><path d="M3.5 17c.8-2 1.9-3 3.25-3s2.45 1 3.25 3M14 17c.8-2 1.9-3 3.25-3s2.45 1 3.25 3"/></svg></span>
         <span class="tx"><strong>Even out a set</strong><span>Same subject size in every photo</span></span>
+        <svg class="i chev" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg>
+      </button>
+      <button class="tool glass" id="goLook">
+        <span class="ic look"><svg class="i" viewBox="0 0 24 24"><circle cx="9" cy="9" r="5.5"/><circle cx="15" cy="15" r="5.5"/></svg></span>
+        <span class="tx"><strong>Copy the look</strong><span>Every photo gets the colours of your favourite one</span></span>
         <svg class="i chev" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg>
       </button>
       <button class="tool glass" id="goRemove">
@@ -92,6 +97,14 @@
     <div class="edit-row" id="editRow" hidden>
       <span id="editHint">Drag onto the head. The dot resizes.</span>
       <button class="btn glass" id="edReset">Use detected</button>
+    </div>
+    <div class="look-row" id="lookRow" hidden>
+      <div class="lk-top"><span>Strength</span><output id="lookVal">100%</output></div>
+      <div class="zoom">
+        <button id="lookLess" aria-label="Less of the look">−</button>
+        <input type="range" id="lookAmt" min="0" max="150" step="1" value="100" aria-label="How much of the reference's look to use">
+        <button id="lookMore" aria-label="More of the look">+</button>
+      </div>
     </div>
     <div class="edit-row" id="eraseRow" hidden>
       <button class="btn glass brush" id="erBrush" aria-label="Brush size: medium"><i></i></button>
